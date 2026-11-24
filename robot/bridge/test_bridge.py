@@ -798,8 +798,10 @@ class FakeClient:
     def call_async(self, request):
         self.requests.append(request)
         future = FakeFuture()
+        delay = (self.delay[len(self.requests) - 1]
+                 if isinstance(self.delay, list) else self.delay)
         if self.answer:
-            threading.Timer(self.delay, future.set_result, (self.response,)).start()
+            threading.Timer(delay, future.set_result, (self.response,)).start()
         return future
 
 
@@ -823,6 +825,15 @@ class ServiceCallTests(unittest.TestCase):
         client = FakeClient(response, ready_after=3)
         self.assertIs(io._call(client, 'req', timeout=0.01), response)
         self.assertEqual(len(client.requests), 1)
+
+    def test_late_reply_does_not_wake_the_next_try(self):
+        io = nb.RobotIO(FakeBridge())
+        response = object()
+        # Try 1 waits 0.1 s and its reply comes at 0.12 s; try 2 starts at
+        # 0.1 s and its reply comes at 0.16 s.
+        client = FakeClient(response, delay=[0.12, 0.06])
+        self.assertIs(io._call(client, 'req', tries=2, timeout=0.025), response)
+        self.assertEqual(len(client.requests), 2)
 
     def test_gives_up_when_never_answered(self):
         io = nb.RobotIO(FakeBridge())

@@ -716,7 +716,9 @@ class RobotIO:
                 stamp_obj.stamp = self._node.get_clock().now().to_msg()
             future = client.call_async(request)
             done = threading.Event()
-            future.add_done_callback(lambda _future: done.set())
+            # Bind this attempt's event: a late reply to an earlier try
+            # must not wake this one.
+            future.add_done_callback(lambda _future, event=done: event.set())
             if done.wait(timeout * 4):
                 try:
                     response = future.result()
