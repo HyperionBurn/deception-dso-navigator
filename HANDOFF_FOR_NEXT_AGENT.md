@@ -34,7 +34,7 @@ Hackathon "Voice of the Oasis", Dtec, Dubai Silicon Oasis, 24-25 Nov 2026. A Man
 | Live agent (prompt, tools, voice) | Works. Short replies, yes/no start question, Arabic/English/Hindi. | `tests/floor-drive.mjs` 28/28 and `tests/live-voice-smoke.mjs` PASS, both against production, about 22:35 |
 | Agent daily limit | Was 75 conversations a day and was hit at about 22:15 (every call was refused). Raised to 1000, concurrency 4, on both agents. | Greeting received again after the change |
 | Website and route tool | Live. Deployed from the merge of 22:25. | Production API calls return the yellow pillar route |
-| Planner change from PR #12 (four filler words) | **In `main`, not deployed.** A deploy at 22:43 hung in "Building" and was abandoned. | `npx vercel ls` |
+| Website and route tool vs `main` | Production was redeployed from `main` at about 23:40, after PR #15. It includes the planner change from PR #12. | A production route call with "looking toward reception" returns a step |
 | Unit tests | `npm test` in `app/`: 94 pass. `python -m pytest -q robot/bridge/test_bridge.py`: 74 pass. | Run at about 22:50 |
 | Floor map | 4 stops, 11 legs, 2 of 8 destinations (team tables, kitchen). Video only, nobody walked it. | `npm run map:check` |
 | Robot | A teammate ran our bridge on the robot tonight. Wasif: "it worked functionally" but the voice cut in and out. | Wasif's report; we have no log from that session |
@@ -129,7 +129,7 @@ What was searched for the missing places:
 
 **P2. Map the six missing places.** Only from evidence: a teammate's description, a photo, a new video, or the organisers. For each place you need the stop's landmark, what it faces, and the legs to and from a stop already in the map. If Wasif asks you to "map from what you know", say plainly that there is no evidence for the booths, and offer the guesses in section 7 as provisional entries that must be confirmed on the floor before filming. A confident wrong route loses more than "not mapped yet".
 
-**P3. Redeploy production from `main`** so the planner change from PR #12 goes live. Check the route tool afterwards.
+**P3. Keep production equal to `main`.** Any merged change to `app/` needs a deploy from Wasif's Vercel project; check the route tool afterwards.
 
 **P4. Robot slot (Wednesday 25 Nov).** Team Guide v2 gives our round 2 as 07:30, code freeze and submission at 08:30, and our pitch at 09:41; the Update says slots were reshuffled, so Wasif must confirm the times. In this order: copy the new `navigator_bridge.py` to the robot (the copy there has the half-speed voice bug); check the voice is smooth; walk both mapped routes there and back and note every wrong turn or landmark; rehearse the three film takes; restore the robot and copy the logs (`CONNECT_TO_ROBOT.md` step 9). Ask for the newest file in `~/deception/logs/` if anything sounds wrong.
 
