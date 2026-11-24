@@ -1,0 +1,20 @@
+# EXAMPLE survey (fictional — not real floor data). Team taped letters at
+# decision points; operators report positions as sign names.
+survey: 2026-11-24 16:40 | Wasif + Sahil | walk-1
+start: A facing kitchen
+
+anchor A: sign A by the entrance | aliases: letter A, entrance sign, اللافتة أ
+anchor B: sign B at the corridor split | aliases: letter B, the split, اللافتة ب
+anchor call_booth_2: Booth 2 sign | aliases: booth two, second booth, الكابينة الثانية
+anchor kitchen: kitchen sign | aliases: المطبخ, food area
+anchor C: sign C outside the call booths | aliases: letter C, اللافتة ج
+
+leg A facing kitchen -> B : left | exit facing booths
+leg B facing booths -> A : around | exit facing kitchen
+leg B facing booths -> call_booth_2 : straight | exit facing booth two sign
+leg call_booth_2 facing booth two sign -> B : around | exit facing booths
+leg B facing booths -> kitchen : right | exit facing kitchen sign
+leg kitchen facing kitchen sign -> B : around | exit facing booths
+leg B facing booths -> C : left | exit facing entrance
+leg C -> call_booth_2 : approach
+leg C facing entrance -> B : around | exit facing booths

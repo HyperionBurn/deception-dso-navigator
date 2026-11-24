@@ -238,5 +238,71 @@ class SignedUrlTests(unittest.TestCase):
             nb.request_signed_url('https://site.test', 'x', opener=lambda r, timeout=None: Response())
 
 
+
+
+class PhaseSignalTests(unittest.TestCase):
+    def _state(self, **kw):
+        base = dict(error=False, reconnecting=False, negotiated=True,
+                    speaking=False, last_user_at=0.0)
+        base.update(kw)
+        return types.SimpleNamespace(**base)
+
+    def test_error_beats_everything(self):
+        state = self._state(error=True, reconnecting=True, negotiated=False,
+                            speaking=True, last_user_at=100.0)
+        self.assertEqual(nb.phase_for(state, now=100.0), 'error')
+
+    def test_reconnecting(self):
+        self.assertEqual(nb.phase_for(self._state(reconnecting=True), now=10.0),
+                         'reconnecting')
+
+    def test_connecting_before_negotiation(self):
+        self.assertEqual(nb.phase_for(self._state(negotiated=False), now=10.0),
+                         'connecting')
+
+    def test_speaking_beats_user_speaking(self):
+        state = self._state(speaking=True, last_user_at=99.5)
+        self.assertEqual(nb.phase_for(state, now=100.0), 'speaking')
+
+    def test_user_speaking_window(self):
+        state = self._state(last_user_at=99.0)
+        self.assertEqual(nb.phase_for(state, now=100.0), 'user_speaking')
+
+    def test_thinking_window(self):
+        state = self._state(last_user_at=95.0)
+        self.assertEqual(nb.phase_for(state, now=100.0), 'thinking')
+
+    def test_listening_after_windows(self):
+        state = self._state(last_user_at=90.0)
+        self.assertEqual(nb.phase_for(state, now=100.0), 'listening')
+
+    def test_listening_with_no_transcript(self):
+        self.assertEqual(nb.phase_for(self._state(), now=100.0), 'listening')
+
+    def test_every_phase_has_signals(self):
+        reachable = {'connecting', 'listening', 'user_speaking', 'thinking',
+                     'speaking', 'reconnecting', 'error', 'stopped'}
+        self.assertEqual(set(nb.PHASE_SIGNALS), reachable)
+        for phase, signal in nb.PHASE_SIGNALS.items():
+            mode, r, g, b = signal['led']
+            self.assertIn(mode, (0, 1, 2, 3), phase)
+            for channel in (r, g, b):
+                self.assertTrue(0 <= channel <= 255, phase)
+            self.assertIsInstance(signal['emoji'], int, phase)
+
+
+class DebouncerTests(unittest.TestCase):
+    def test_first_call_ready_then_blocked(self):
+        d = nb.Debouncer(2.0)
+        self.assertTrue(d.ready(now=10.0))
+        self.assertFalse(d.ready(now=10.5))
+        self.assertFalse(d.ready(now=11.9))
+
+    def test_ready_after_window(self):
+        d = nb.Debouncer(2.0)
+        self.assertTrue(d.ready(now=10.0))
+        self.assertTrue(d.ready(now=12.0))
+
+
 if __name__ == '__main__':
     unittest.main()
