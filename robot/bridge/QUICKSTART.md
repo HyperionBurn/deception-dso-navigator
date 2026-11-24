@@ -17,10 +17,9 @@ pip3 install websocket-client numpy
 # no pip internet? offline install from the vendored wheel:
 # pip3 install --no-index --find-links vendor websocket-client numpy
 source /opt/ros/humble/setup.bash && source <aimdk>/install/setup.bash   # engineer gives the AimDK path
-export ELEVENLABS_API_KEY=sk_...        # private agent; from app/.env.local
-# optional overrides:
+export NAVIGATOR_ACCESS_CODE=...        # ask Wasif; never write it in a file. The bridge gets its session from our site, so no ElevenLabs key goes on the robot
+# optional override:
 # export ELEVENLABS_AGENT_ID=agent_...  # defaults to our prod agent
-# export NAVIGATOR_ACCESS_CODE=...      # only needed for --session site
 ```
 
 ## 3. Preflight (one ROS node, ~15 s, prints PASS/FAIL)
@@ -52,7 +51,7 @@ Say the robot's wake word once (MangoBot says which), then talk normally.
 |---|---|
 | It interrupts itself | Restart with `--half-duplex` (mic mutes while the robot speaks) |
 | Speaker stays silent | Agent output must be `pcm_16000`; check `FOCUS: … focus_gain=false` in the log — ask MangoBot to check the agent module |
-| No connection | No internet in the container — tell the engineer; or `--session direct` with `ELEVENLABS_API_KEY` |
+| No connection | No internet in the container — tell the engineer, or run the bridge on a laptop next to the robot (`--io laptop`) |
 | Loud room | Ask the engineer for the external mic and which stream_id it uses (docs: 1 = external), then `--mic-stream <id>` |
 | Repeats leg-1 instruction | Site route tool down — check `SESSION:`/`PROTOCOL:` log lines |
 
@@ -65,7 +64,7 @@ Say the robot's wake word once (MangoBot says which), then talk normally.
 
 ## Hard rules (from MangoBot/AgiBot)
 
-- Code only inside the container on PC2. Never PC1 (10.0.1.40).
+- Code only inside the container on PC2. Never PC1.
 - At most 2 ROS nodes — our bridge runs exactly one.
 - Save only under `/home/agi`, never in `aimdk*`. Keep a copy on your laptop.
 - Don't touch OS, drivers, DDS, configs, firmware, power, hardware. No factory reset.
