@@ -13,9 +13,9 @@ robot's host (there is no Docker container), use the raw microphone, run half du
 - Two things that are **not** in this repo; ask Wasif:
   - the robot login password (from the organisers' message),
   - our team access code.
-- Robot address:
-  - **Robot 2 on the hall Wi-Fi: `<robot-ip>`**
-  - on the cable: `<robot-ip>` (also `.40` / `.42`)
+- Robot address (not in this repo on purpose: take it from the organisers' message or ask Wasif):
+  - on the hall Wi-Fi: the address in the organisers' message for our robot
+  - on the cable: the cable address in the same message
   - if neither answers, find it from a Mac: `dns-sd -B _agibot._tcp local`, then `dns-sd -L <name> _agibot._tcp local`
 
 Below, `ROBOT` means that address.
