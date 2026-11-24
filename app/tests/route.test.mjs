@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import route from '../api/route.mjs';
 import { COURSE_DESTINATIONS, FLOOR_MAP } from '../lib/floor-map.mjs';
-import { auditMap, planRoute } from '../lib/route-planner.mjs';
+import { auditMap, planRoute, tokenize } from '../lib/route-planner.mjs';
 
 // Fictional labels, evidence, and topology. Never load this map in production.
 const evidence = {
@@ -43,6 +43,36 @@ test('guide destinations do not establish anchors, routes, or arrival', () => {
       status: 'unverified', reason: 'destination_not_checked',
     });
   }
+});
+
+test('a capital sign letter joins the word sign into one token', () => {
+  assert.ok(tokenize('Sign B.').has('signb'));
+  assert.ok(!tokenize('Sign B.').has('sign'));
+  assert.deepEqual(tokenize('sign A'), new Set(['signa']));
+  const plain = tokenize('a sign a few metres on');
+  assert.ok(plain.has('sign'));
+  assert.ok(!plain.has('signa'));
+});
+
+test('needs_anchor offers the checked start as likely_start only when position is unknown', () => {
+  const local = {
+    anchors: [
+      anchor('kitchen', 'the kitchen sign'),
+      anchor('team_tables', 'the team tables sign'),
+    ],
+    edges: [],
+    start: { anchor: 'kitchen', facing: 'window' },
+  };
+  const result = planRoute(local, { destination_id: 'team_tables' });
+  assert.equal(result.status, 'needs_anchor');
+  assert.deepEqual(result.likely_start, { landmark: 'the kitchen sign', facing: 'window' });
+  const supplied = planRoute(local, {
+    destination_id: 'team_tables', current_landmark: 'the fountain',
+  });
+  assert.equal(supplied.status, 'needs_anchor');
+  assert.equal('likely_start' in supplied, false);
+  const noStart = { anchors: local.anchors, edges: [] };
+  assert.equal('likely_start' in planRoute(noStart, { destination_id: 'team_tables' }), false);
 });
 
 test('a destination without a checked anchor is unverified before position is asked', () => {

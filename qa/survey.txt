@@ -16,15 +16,15 @@ survey: 2026-11-24 18:47 | video only, not yet walked | IMG_3440.MOV
 # facing reception; the cafeteria is on the left.
 start: A facing reception
 
-anchor A: the pitch room door | aliases: pitch room, pitch room door, black wall, the start, steel bin, باب قاعة العروض, قاعة العروض
-anchor team_tables: the purple pillar with the green speech bubble | aliases: purple pillar, magenta pillar, speech bubble, green speech bubble, team tables, the desks, طاولات الفرق, العمود البنفسجي
-anchor B: the peach pillar | aliases: peach pillar, pink pillar, orange pillar, العمود الوردي, العمود البرتقالي
+anchor A: the pitch room door | aliases: sign A, pitch room, pitch room door, black wall, the start, steel bin, باب قاعة العروض, قاعة العروض
+anchor team_tables: the purple pillar with the green speech bubble | aliases: purple pillar, magenta pillar, maroon pillar, burgundy pillar, plum pillar, speech bubble, green speech bubble, yellow speech bubble, team tables, the desks, طاولات الفرق, العمود البنفسجي
+anchor B: the yellow pillar | aliases: sign B, yellow pillar, yellow column, yellow pillar with the glass board, العمود الأصفر
 anchor kitchen: the cafeteria menu boards | aliases: cafeteria, menu boards, the menu, kitchen, pizza counter, الكافتيريا, المطبخ, قائمة الطعام
 
 # Forward, filmed in walking order.
 # 3440 0:17-0:27: purple pillar and team tables on the right of the walkway.
 leg A facing reception -> team_tables : straight | exit facing reception
-# 3440 0:28-0:38: on past the black lattice screen (left) to the peach pillar
+# 3440 0:28-0:38: on past the black lattice screen (left) to the yellow pillar
 # (right), where the cafeteria opens on the left.
 leg team_tables facing reception -> B : straight | exit facing reception
 # 3440 0:38-0:41: left turn of about 90 degrees faces the menu boards
@@ -32,7 +32,7 @@ leg team_tables facing reception -> B : straight | exit facing reception
 leg B facing reception -> kitchen : left | exit facing menu boards
 
 # Return, from the view filmed inside the cafeteria at 3440 1:02-1:06: the
-# peach pillar is straight across the walkway and the purple pillar is to
+# yellow pillar is straight across the walkway and the purple pillar is to
 # its right, toward the pitch room.
 leg kitchen facing menu boards -> B : around | exit facing team tables
 leg B facing team tables -> team_tables : right | exit facing pitch room

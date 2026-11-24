@@ -664,3 +664,90 @@ class MarkerTrackerTests(unittest.TestCase):
         self.assertEqual(nb.MARKER_LABELS[11], 'call booth 1')
         self.assertEqual(nb.MARKER_LABELS[24], 'the kitchen')
         self.assertEqual(len(nb.MARKER_LABELS), 14)
+
+
+try:
+    import cv2
+    import numpy as np
+    HAS_ARUCO = hasattr(cv2, 'aruco') and hasattr(cv2.aruco, 'generateImageMarker')
+except ImportError:
+    cv2 = np = None
+    HAS_ARUCO = False
+
+
+class MarkerObservationTests(unittest.TestCase):
+    def square(self, cx, cy, side):
+        half = side / 2
+        return [[cx - half, cy - half], [cx + half, cy - half],
+                [cx + half, cy + half], [cx - half, cy + half]]
+
+    def test_centred_square_with_intrinsics(self):
+        obs = nb.marker_observation(self.square(640, 360, 100), 1280, fx=960)
+        self.assertAlmostEqual(obs['side_px'], 100.0)
+        self.assertAlmostEqual(obs['distance_m'], 1.22, places=2)
+        self.assertEqual(obs['bearing'], 'ahead')
+        self.assertTrue(obs['at'])
+
+    def test_off_centre_is_not_at(self):
+        obs = nb.marker_observation(self.square(128, 360, 100), 1280, fx=960)
+        self.assertEqual(obs['bearing'], 'left')
+        self.assertFalse(obs['at'])
+
+    def test_size_fallback_without_intrinsics(self):
+        near = nb.marker_observation(self.square(640, 360, 100), 1280)
+        self.assertIsNone(near['distance_m'])
+        self.assertTrue(near['at'])
+        far = nb.marker_observation(self.square(640, 360, 40), 1280)
+        self.assertFalse(far['at'])
+
+    def test_marker_name(self):
+        self.assertEqual(nb.marker_name(2), 'sign B')
+        self.assertEqual(nb.marker_name(24), 'the kitchen marker')
+        self.assertEqual(nb.marker_name(11), 'call booth 1 marker')
+
+
+@unittest.skipUnless(HAS_ARUCO, 'cv2.aruco not installed')
+class CameraMarkerEventTests(unittest.TestCase):
+    def setUp(self):
+        self.sent = []
+        bridge = types.SimpleNamespace(
+            log=lambda *a, **k: None,
+            send_contextual=self.sent.append)
+        io = nb.RobotIO.__new__(nb.RobotIO)
+        io._bridge = bridge
+        io._cv2, io._np = cv2, np
+        dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        io._detector = cv2.aruco.ArucoDetector(
+            dictionary, cv2.aruco.DetectorParameters())
+        io._aruco_dict = None
+        io._cam_last = 0.0
+        io._markers = nb.MarkerTracker()
+        io._at_markers = nb.MarkerTracker(stable_frames=2, cooldown=30.0)
+        io._camera_fx = None
+        io._camera_info_width = None
+        self.io = io
+        self.dictionary = dictionary
+
+    def frame_with_marker(self, marker_id, side, cx, cy=360):
+        marker = cv2.aruco.generateImageMarker(self.dictionary, marker_id, side)
+        frame = np.full((720, 1280), 255, np.uint8)
+        y0, x0 = cy - side // 2, cx - side // 2
+        frame[y0:y0 + side, x0:x0 + side] = marker
+        ok, jpeg = cv2.imencode('.jpg', frame)
+        self.assertTrue(ok)
+        return types.SimpleNamespace(data=jpeg.tobytes())
+
+    def feed(self, msg, frames=5):
+        for _ in range(frames):
+            self.io._cam_last = 0.0      # reset the frame throttle
+            self.io._on_camera(msg)
+
+    def test_at_marker_reports_position_once(self):
+        self.feed(self.frame_with_marker(24, 200, 640))
+        self.assertEqual(self.sent,
+                         ['Camera: the robot is now at the kitchen marker.'])
+
+    def test_seen_marker_reports_bearing_once(self):
+        self.feed(self.frame_with_marker(24, 60, 150))
+        self.assertEqual(self.sent,
+                         ['Camera: the kitchen marker is visible to the left.'])

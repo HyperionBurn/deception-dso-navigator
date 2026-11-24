@@ -11,7 +11,7 @@ survey: 2026-11-24 18:47 | video draft, unwalked | IMG_3440.MOV
 start: A facing reception
 
 anchor A: pitch room door at the black wall | aliases: pitch room door, black wall, steel bin, باب قاعة العروض
-anchor B: peach pillar opposite the cafeteria | aliases: peach pillar, pink pillar, orange pillar, cafeteria entrance, العمود الوردي
+anchor B: yellow pillar opposite the cafeteria | aliases: yellow pillar, yellow column, cafeteria entrance, العمود الأصفر
 anchor team_tables: purple pillar with the green speech bubble | aliases: purple pillar, speech bubble, team tables, طاولات الفرق
 anchor kitchen: cafeteria menu boards | aliases: cafeteria, menu boards, the kitchen, الكافتيريا, المطبخ
 
@@ -19,7 +19,7 @@ anchor kitchen: cafeteria menu boards | aliases: cafeteria, menu boards, the kit
 # team tables are on the right-hand side.
 leg A facing reception -> team_tables : straight | exit facing reception
 # 3440 0:28-0:38: further along the walkway, past the black lattice screen
-# on the left, the peach pillar stands on the right where the cafeteria opens
+# on the left, the yellow pillar stands on the right where the cafeteria opens
 # on the left.
 leg team_tables facing reception -> B : straight | exit facing reception
 # 3440 0:38-0:41: turning left off the walkway faces the menu boards. COLMAP

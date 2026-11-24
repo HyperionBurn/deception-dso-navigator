@@ -132,7 +132,7 @@ Defaults (match the organisers' official bridge): `--io robot`, `--mic vad` (voi
 4. **Confirm (unmapped place):** "إيه". Expect an Arabic reply that the call booths are not mapped yet, offering the team tables or the kitchen, plus "Operator, hold position." Only the team tables and the kitchen are mapped so far; that is correct behaviour.
 5. **Real route:** say "المطبخ" (the kitchen). Expect an Arabic confirmation, "Operator, we're going to the kitchen" and a question about where the robot is. Then say the operator lines one at a time and note each reply:
    - "Operator here, at the pitch room door, facing reception." Expect "Operator, walk straight and stop at the purple pillar with the green speech bubble."
-   - "Done." Expect "…walk straight and stop at the peach pillar."
+   - "Done." Expect "…walk straight and stop at the yellow pillar."
    - "Done." Expect "…turn left. Walk straight and stop at the cafeteria menu boards."
    - "Done." Expect "Operator, stop here. Can you confirm we're at the cafeteria menu boards?"
    - "Confirmed." Expect the arrival announcement in Arabic.
@@ -151,7 +151,7 @@ Defaults (match the organisers' official bridge): `--io robot`, `--mic vad` (voi
 
 - **Works today (tested against production):** greeting; Arabic/English/Hindi understanding and replies (Arabic and Hindi audio verified clean by transcribing the agent's own speech); clarifying questions; separate English operator lines; destination changes; route tool calls; facts via research; recognising requests under loud background music.
 - **Works on the rehearsal (fictional) map only:** multi-step routes (new step after every "Done", stop, confirm, arrival) and re-planning after a destination change.
-- **Real floor directions for two places only:** the team tables and the kitchen (the cafeteria), in both directions along pitch room door → purple pillar with the green speech bubble → peach pillar → cafeteria menu boards. These legs were drafted from a video (`qa/FLOOR FROM VIDEO.md`) and have **not been walked**; the operator's confirmation at each stop is the check.
+- **Real floor directions for two places only:** the team tables and the kitchen (the cafeteria), in both directions along pitch room door → purple pillar with the green speech bubble → yellow pillar → cafeteria menu boards. These legs were drafted from a video (`qa/FLOOR FROM VIDEO.md`) and have **not been walked**; the operator's confirmation at each stop is the check.
 - **Not yet:** the meeting room, the conference room and the four call booths. They are not located, so the agent says they are not mapped and offers the two mapped places. New places go into `qa/survey.txt` (`qa/SURVEY FORMAT.md`), then `npm run map:ingest` in `app/`.
 - **Never run on the robot before:** robot mode of the bridge (written exactly from the AgiBot docs and the organisers' bridge, unit-tested, but this slot is its first real run).
 

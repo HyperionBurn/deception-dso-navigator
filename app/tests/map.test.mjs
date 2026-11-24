@@ -92,6 +92,19 @@ test('a top-score tie is reported as ambiguous with candidate landmarks', () => 
   });
 });
 
+test('a capital sign letter matches its alias; a generic sign does not', () => {
+  const local = {
+    anchors: [anchor('sign_a', 'the start board', ['sign A']), anchor('call_booth_2', 'booth two')],
+    edges: [edge('sign_a', 'call_booth_2', 'approach_visible', null, null)],
+  };
+  assert.equal(planRoute(local, {
+    destination_id: 'call_booth_2', current_landmark: 'Sign A',
+  }).status, 'step');
+  const exit = planRoute(local, { destination_id: 'call_booth_2', current_landmark: 'the exit sign' });
+  assert.equal(exit.status, 'needs_anchor');
+  assert.equal(exit.reason, 'current_anchor_required');
+});
+
 test('an unmatched observation lists known landmarks, start anchor first', () => {
   const withStart = { ...map, start: { anchor: 'kitchen', heading: 'east' } };
   const result = route(withStart, { current_landmark: 'the fountain' });
