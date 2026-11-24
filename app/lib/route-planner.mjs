@@ -53,11 +53,11 @@ const SIGHTING = new RegExp(
   '|(?<![\\p{L}])(?:بعيد|بعيده|بعيدة|خلفي|ورا|وراي)(?![\\p{L}])', 'iu');
 
 // "On my left" or "to the right" says where a place is, not that the operator is at it.
-const SIDE = /\b(?:on|to) (?:my |the )?(?:left|right)\b|\b(?:left|right) of me\b|\bbeside me\b/iu;
+const SIDE = /\b(?:on|to) (?:my |the )?(?:left|right)\b|\b(?:left|right) of me\b|\bbeside me\b|(?<!\p{L})(?:على|عن) (?:يميني|يساري|اليمين|اليسار)(?!\p{L})/iu;
 // Seeing the destination is not arriving. Seeing a waypoint is still fine (same question as above).
-const SEEING = /\b(?:see|sees|seeing|seen|saw|spot|spotted|visible)\b/iu;
+const SEEING = /\b(?:see|sees|seeing|seen|saw|spot|spotted|visible)\b|(?<!\p{L})(?:اشوف|أشوف|شايف|شايفه|شايفة)(?!\p{L})/iu;
 // Words that start a facing inside a position: "sign B, facing the pitch room".
-const FACING_WORDS = /\b(?:facing|toward|towards|looking|look)\b/iu;
+const FACING_WORDS = /\b(?:facing|toward|towards|looking|look)\b|(?<!\p{L})و?(?:مواجه|مواجهة|مواجهه|باتجاه|متجه|وجهي)(?!\p{L})/iu;
 
 export const tokenize = value => {
   const text = value.normalize('NFC')
@@ -243,10 +243,13 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
       ? { status: 'needs_anchor', reason: 'current_anchor_required', known_landmarks: known }
       : { status: 'needs_anchor', reason: 'current_anchor_required' };
     const start = map?.start;
-    if (current_id == null && current_landmark == null && start && anchors.has(start.anchor)) {
+    // The tool keeps no state: a facing or heading means the trip may be under way, so no start guess.
+    if (current_id == null && current_landmark == null && heading == null && facing == null &&
+        start && anchors.has(start.anchor)) {
       const pose = validPose({ facing: start.facing }) ? { facing: start.facing }
         : validPose({ heading: start.heading }) ? { heading: start.heading } : {};
       result.likely_start = { landmark: anchors.get(start.anchor).landmark, ...pose };
+      result.likely_start_note = 'Only for the first question of a trip. Ignore it after the robot has moved.';
     }
     return result;
   };
