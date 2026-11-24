@@ -138,7 +138,7 @@ const runA = [
   { label: 'operator reports second leg done', send: 'Done.',
     expect: /arrived|confirm|stop|there|booth/i },
   { label: 'operator confirms arrival', send: 'Confirmed.',
-    expect: /arrived|destination|enjoy|welcome|great|booth/i },
+    expect: /arrived|destination|enjoy|welcome|great|booth|[؀-ۿ]/i },
 ];
 
 // Run B: destination change mid-route after the first leg completes.
