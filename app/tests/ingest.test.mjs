@@ -121,9 +121,7 @@ test('serialize + writeFloorMapSource replace only the FLOOR_MAP export', async 
   assert.equal(step.status, 'step');
 });
 
-test('the shipped FLOOR_MAP stays empty and the CLI dry-run audits without writing', async () => {
-  assert.deepEqual(FLOOR_MAP.anchors, []);
-  assert.deepEqual(FLOOR_MAP.edges, []);
+test('the CLI dry-run audits without writing', async () => {
   const example = fileURLToPath(new URL('../../qa/survey.example.txt', import.meta.url));
   const cwd = fileURLToPath(new URL('..', import.meta.url));
   const { stdout, stderr } = await run(process.execPath,

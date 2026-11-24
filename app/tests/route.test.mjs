@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import route from '../api/route.mjs';
 import { COURSE_DESTINATIONS, FLOOR_MAP } from '../lib/floor-map.mjs';
-import { planRoute } from '../lib/route-planner.mjs';
+import { auditMap, planRoute } from '../lib/route-planner.mjs';
 
 // Fictional labels, evidence, and topology. Never load this map in production.
 const evidence = {
@@ -37,12 +37,118 @@ const map = {
 
 test('guide destinations do not establish anchors, routes, or arrival', () => {
   assert.equal(COURSE_DESTINATIONS.length, 8);
-  assert.deepEqual(FLOOR_MAP, { anchors: [], edges: [] });
+  const empty = { anchors: [], edges: [] };
   for (const id of COURSE_DESTINATIONS) {
-    assert.deepEqual(planRoute(FLOOR_MAP, { destination_id: id, current_id: id }), {
-      status: 'needs_anchor', reason: 'current_anchor_required',
+    assert.deepEqual(planRoute(empty, { destination_id: id, current_id: id }), {
+      status: 'unverified', reason: 'destination_not_checked',
     });
   }
+});
+
+test('a destination without a checked anchor is unverified before position is asked', () => {
+  const local = {
+    anchors: [
+      anchor('kitchen', 'the kitchen sign'),
+      anchor('team_tables', 'the team tables sign'),
+      anchor('waypoint', 'the waypoint sign'),
+    ],
+    edges: [],
+  };
+  const expected = {
+    status: 'unverified', reason: 'destination_not_checked',
+    mapped_destinations: ['team_tables', 'kitchen'],
+  };
+  assert.deepEqual(planRoute(local, { destination_id: 'meeting_room' }), expected);
+  assert.deepEqual(planRoute(local, {
+    destination_id: 'meeting_room', current_landmark: 'the fountain',
+  }), expected);
+  const missing = planRoute(local, { destination_id: 'kitchen' });
+  assert.equal(missing.status, 'needs_anchor');
+  assert.equal(missing.reason, 'current_anchor_required');
+  assert.equal(missing.known_landmarks.length, 3);
+});
+
+test('facing the next stop of a straight leg implies its entry pose', () => {
+  const local = {
+    anchors: [
+      anchor('start', 'the start line'),
+      anchor('team_tables', 'the team tables sign'),
+      anchor('kitchen', 'the kitchen sign'),
+    ],
+    edges: [
+      edge('start', 'team_tables', 'walk_straight', { facing: 'window' }, { facing: 'window' }),
+      edge('team_tables', 'kitchen', 'left_then_straight', { facing: 'window' }, { facing: 'counter' }),
+    ],
+  };
+  const implied = planRoute(local, {
+    destination_id: 'kitchen', current_id: 'start', facing: 'the team tables sign',
+  });
+  assert.equal(implied.status, 'step');
+  assert.equal(implied.command, 'Walk straight and stop at the team tables sign.');
+  assert.equal(implied.next_id, 'team_tables');
+  assert.deepEqual(planRoute(local, {
+    destination_id: 'kitchen', current_id: 'team_tables', facing: 'the kitchen sign',
+  }), {
+    status: 'needs_anchor', reason: 'current_orientation_required', known_facings: ['window'],
+  });
+  const twoPoses = {
+    ...local,
+    edges: [...local.edges,
+      edge('start', 'team_tables', 'walk_straight', { facing: 'door' }, { facing: 'window' })],
+  };
+  const ambiguous = planRoute(twoPoses, {
+    destination_id: 'kitchen', current_id: 'start', facing: 'the team tables sign',
+  });
+  assert.equal(ambiguous.status, 'needs_anchor');
+  assert.equal(ambiguous.reason, 'current_orientation_required');
+  const directLabel = {
+    ...local,
+    edges: [...local.edges,
+      edge('start', 'kitchen', 'walk_straight', { facing: 'the team tables sign' }, { facing: 'counter' })],
+  };
+  const direct = planRoute(directLabel, {
+    destination_id: 'kitchen', current_id: 'start', facing: 'the team tables sign',
+  });
+  assert.equal(direct.status, 'step');
+  assert.equal(direct.command, 'Walk straight and stop at the kitchen sign.');
+});
+
+test('the shipped FLOOR_MAP audits clean', () => {
+  const audit = auditMap(FLOOR_MAP);
+  assert.deepEqual(audit.rejected, []);
+  if (FLOOR_MAP.anchors.length) {
+    assert.ok(FLOOR_MAP.survey.checked_at);
+    assert.ok(FLOOR_MAP.survey.checked_by);
+    assert.ok(FLOOR_MAP.survey.reference);
+  }
+});
+
+test('unverified results list the other mapped destinations', () => {
+  const local = {
+    anchors: [
+      anchor('kitchen', 'the kitchen sign'),
+      anchor('team_tables', 'the team tables sign'),
+      anchor('waypoint', 'the waypoint sign'),
+    ],
+    edges: [],
+  };
+  const expected = ['team_tables', 'kitchen'];
+  assert.deepEqual(planRoute(local, {
+    destination_id: 'meeting_room', current_id: 'kitchen',
+  }), {
+    status: 'unverified', reason: 'destination_not_checked',
+    mapped_destinations: expected,
+  });
+  assert.deepEqual(planRoute(local, {
+    destination_id: 'outside', current_id: 'kitchen',
+  }), {
+    status: 'unverified', reason: 'unknown_destination',
+    mapped_destinations: expected,
+  });
+  const empty = { anchors: [], edges: [] };
+  const result = planRoute(empty, { destination_id: 'outside', current_id: 'kitchen' });
+  assert.deepEqual(result, { status: 'unverified', reason: 'unknown_destination' });
+  assert.equal('mapped_destinations' in result, false);
 });
 
 test('plans one step and reroutes from the last confirmed or newly observed anchor', () => {
@@ -102,6 +208,7 @@ test('checks pose at intermediate nodes and can revisit nodes in distinct poses'
   for (const badExit of [bad, { ...bad, exit_pose: null }]) {
     assert.deepEqual(planRoute({ anchors, edges: [badExit, final] }, input), {
       status: 'unverified', reason: 'no_checked_route',
+      mapped_destinations: ['conference_room'],
     });
   }
   assert.equal(planRoute({ anchors, edges: [bad, good, final] }, input).command,
@@ -132,7 +239,7 @@ test('arrival requires the observed, checked destination ID', () => {
   });
   assert.equal(planRoute(map, { ...input, current_id: 'junction', ...facing }).status, 'step');
   const unchecked = { ...map, anchors: anchors.map(a => a.id === destination_id ? { ...a, evidence: null } : a) };
-  assert.equal(planRoute(unchecked, input).status, 'needs_anchor');
+  assert.equal(planRoute(unchecked, input).status, 'unverified');
 });
 
 test('route API accepts only its dedicated header and valid observation input', async t => {
@@ -173,9 +280,11 @@ test('route API accepts only its dedicated header and valid observation input', 
   const result = await request(routeKey);
   assert.equal(result.status, 200);
   assert.equal(result.headers.get('cache-control'), 'no-store');
-  assert.deepEqual(await result.json(), { status: 'needs_anchor', reason: 'current_anchor_required' });
+  const planned = await result.json();
+  assert.equal(planned.status, 'unverified');
+  assert.equal(planned.reason, 'destination_not_checked');
   const raw = await request(routeKey, {
-    destination_id: 'meeting_room', current_landmark: 'the unknown marker', ...north,
+    destination_id: 'kitchen', current_landmark: 'the unknown marker', ...north,
   });
   assert.equal(raw.status, 200);
   assert.equal((await raw.json()).status, 'needs_anchor');

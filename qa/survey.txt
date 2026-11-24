@@ -2,3 +2,45 @@
 # qa/survey.example.txt for a worked EXAMPLE. Then run:
 #   npm run map:ingest -- --dry-run     # audit without writing
 #   npm run map:ingest                  # write FLOOR_MAP + audit
+
+# PROVISIONAL: every line below comes from video IMG_3440.MOV (24 Nov 2026),
+# not from a walk. Evidence per line is in "qa/FLOOR FROM VIDEO.md". Loaded
+# into production on the team's decision so the robot can be tested with
+# real directions. Walk every leg before filming and correct this file.
+# Not located yet: meeting room, conference room, call booths 1-4.
+survey: 2026-11-24 18:47 | video only, not yet walked | IMG_3440.MOV
+
+# The striped walkway runs from the pitch room door to the reception hall.
+# "facing reception" = looking down the walkway away from the pitch room.
+# "facing pitch room" = the opposite way. Team tables are on the right when
+# facing reception; the cafeteria is on the left.
+start: A facing reception
+
+anchor A: the pitch room door | aliases: pitch room, pitch room door, black wall, the start, steel bin, باب قاعة العروض, قاعة العروض
+anchor team_tables: the purple pillar with the green speech bubble | aliases: purple pillar, magenta pillar, speech bubble, green speech bubble, team tables, the desks, طاولات الفرق, العمود البنفسجي
+anchor B: the peach pillar | aliases: peach pillar, pink pillar, orange pillar, العمود الوردي, العمود البرتقالي
+anchor kitchen: the cafeteria menu boards | aliases: cafeteria, menu boards, the menu, kitchen, pizza counter, الكافتيريا, المطبخ, قائمة الطعام
+
+# Forward, filmed in walking order.
+# 3440 0:17-0:27: purple pillar and team tables on the right of the walkway.
+leg A facing reception -> team_tables : straight | exit facing reception
+# 3440 0:28-0:38: on past the black lattice screen (left) to the peach pillar
+# (right), where the cafeteria opens on the left.
+leg team_tables facing reception -> B : straight | exit facing reception
+# 3440 0:38-0:41: left turn of about 90 degrees faces the menu boards
+# (COLMAP, two reconstructions).
+leg B facing reception -> kitchen : left | exit facing menu boards
+
+# Return, from the view filmed inside the cafeteria at 3440 1:02-1:06: the
+# peach pillar is straight across the walkway and the purple pillar is to
+# its right, toward the pitch room.
+leg kitchen facing menu boards -> B : around | exit facing team tables
+leg B facing team tables -> team_tables : right | exit facing pitch room
+leg team_tables facing pitch room -> A : straight | exit facing pitch room
+
+# Same places entered with the other facing (turn around first).
+leg A facing pitch room -> team_tables : around | exit facing reception
+leg team_tables facing reception -> A : around | exit facing pitch room
+leg team_tables facing pitch room -> B : around | exit facing reception
+leg B facing reception -> team_tables : around | exit facing pitch room
+leg B facing team tables -> kitchen : around | exit facing menu boards
