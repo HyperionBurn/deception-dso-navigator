@@ -32,14 +32,15 @@ CHUNK_MS = 100
 CHUNK_BYTES = RATE * CHUNK_MS // 1000 * 2       # 3200 B of S16LE mono
 PUBLISH_MS = 50
 PUBLISH_BYTES = RATE * PUBLISH_MS // 1000 * 2   # 1600 B
-PLAYBACK_LOOKAHEAD = 1.0                       # max seconds queued on device
-TAIL_SECONDS = 0.4
+PLAYBACK_LOOKAHEAD = 0.3                       # seconds of audio queued ahead (org bridge: lead)
+TAIL_SECONDS = 0.5                             # speaking gate = queued audio + this (org: lead + 0.5)
 MIC_QUEUE_CHUNKS = 30                          # ~3 s of capture before dropping
 TRANSCRIPT_LINES = 12
 RECONNECT_DELAYS = [1, 2, 4, 8, 16]            # max 5 retries
 SOCKET_TIMEOUT = 15.0
 PKG_NAME = 'deception_navigator'
-FOCUS_PRIORITY = 6
+FOCUS_PRIORITY = 8                             # same value as AgiBot's stream example / org bridge
+PROD_AGENT_ID = 'agent_0101m86hthvjfm6vqeymg81may5e'
 SILENCE = b'\x00' * CHUNK_BYTES
 DEFAULT_SITE = 'https://deception-dso-navigator.vercel.app'
 
@@ -65,7 +66,9 @@ ALLOWED_ROS_NAMES = frozenset({
     '/agent/process_audio_output',
     '/aima/hal/audio/playback',
     '/aima/hal/audio/play_state',
+    '/aima/hal/audio/focus_response',
     '/aima/hal/sensor/touch_head',
+    '/aima/hal/sensor/rgbd_head_front/rgb_image/compressed',
     '/aimdk_5Fmsgs/srv/RequestAudioFocus',
     '/aimdk_5Fmsgs/srv/AbandonAudioFocus',
     '/aimdk_5Fmsgs/srv/StopAudioPlay',
@@ -192,6 +195,49 @@ class Debouncer:
             return False
         self._last = now
         return True
+
+
+# ArUco DICT_4X4_50 marker id -> what the printed sign means. Printed PNGs live
+# in robot/markers/ (same id doubles as the operator's sign and the camera's
+# ground truth).
+MARKER_LABELS = {
+    **{i: f'sign {chr(ord("A") + i - 1)}' for i in range(1, 7)},
+    **{10 + i: f'call booth {i}' for i in range(1, 5)},
+    21: 'the meeting room',
+    22: 'the conference room',
+    23: 'the team tables',
+    24: 'the kitchen',
+}
+
+
+class MarkerTracker:
+    """Turns per-frame ArUco id lists into debounced sightings: a marker counts
+    only after `stable_frames` consecutive frames that contain it, and each id
+    reports at most once per `cooldown` seconds."""
+
+    def __init__(self, stable_frames=3, cooldown=20.0):
+        self.stable_frames = stable_frames
+        self.cooldown = cooldown
+        self._candidate = None
+        self._streak = 0
+        self._sent = {}
+
+    def note(self, ids, now=None):
+        """ids = marker ids visible in this processed frame. Returns the id of
+        a newly confirmed sighting to report, or None."""
+        now = time.monotonic() if now is None else now
+        visible = {int(i) for i in ids} & set(MARKER_LABELS)
+        if self._candidate in visible:
+            self._streak += 1
+        else:
+            self._candidate = next(iter(visible), None)
+            self._streak = 1 if self._candidate is not None else 0
+        if self._candidate is None or self._streak < self.stable_frames:
+            return None
+        if now - self._sent.get(self._candidate, float('-inf')) < self.cooldown:
+            return None
+        self._sent[self._candidate] = now
+        return self._candidate
 
 
 class StallWatcher:
@@ -374,6 +420,42 @@ def request_signed_url(site, code, opener=None):
     return url
 
 
+def direct_signed_url(agent_id, api_key, opener=None):
+    """GET ElevenLabs get-signed-url, like the organizers' bridge. A public
+    agent needs no key; a private one needs ELEVENLABS_API_KEY."""
+    if not api_key:
+        return ('wss://api.elevenlabs.io/v1/convai/conversation'
+                f'?agent_id={agent_id}')
+    request = urllib.request.Request(
+        'https://api.elevenlabs.io/v1/convai/conversation/get-signed-url'
+        f'?agent_id={agent_id}',
+        headers={'xi-api-key': api_key})
+    open_url = opener or urllib.request.urlopen
+    with open_url(request, timeout=SOCKET_TIMEOUT) as response:
+        body = json.loads(response.read().decode('utf-8'))
+    url = body.get('signed_url') or body.get('signedUrl')
+    if not url:
+        raise RuntimeError('get-signed-url returned no signed URL')
+    return url
+
+
+def session_url(session, site, code, agent_id, api_key, log=lambda *a: None):
+    """Resolve a websocket URL. auto = our site first, direct ElevenLabs as
+    fallback when an API key is configured."""
+    if session == 'direct':
+        log('SESSION: direct (get-signed-url)')
+        return direct_signed_url(agent_id, api_key)
+    try:
+        url = request_signed_url(site, code)
+        log('SESSION: site /api/session')
+        return url
+    except Exception:
+        if session == 'site' or not api_key:
+            raise
+        log('SESSION: site path failed; using direct ElevenLabs')
+        return direct_signed_url(agent_id, api_key)
+
+
 # ---------------------------------------------------------------------------
 # IO backends
 # ---------------------------------------------------------------------------
@@ -463,6 +545,7 @@ class RobotIO:
     PROCESSED_TOPIC = '/agent/process_audio_output'
     PLAYBACK_TOPIC = '/aima/hal/audio/playback'
     PLAY_STATE_TOPIC = '/aima/hal/audio/play_state'
+    FOCUS_RESPONSE_TOPIC = '/aima/hal/audio/focus_response'
     FOCUS_SRV = '/aimdk_5Fmsgs/srv/RequestAudioFocus'
     ABANDON_SRV = '/aimdk_5Fmsgs/srv/AbandonAudioFocus'
     STOP_SRV = '/aimdk_5Fmsgs/srv/StopAudioPlay'
@@ -470,15 +553,30 @@ class RobotIO:
     LED_SRV = '/aimdk_5Fmsgs/srv/SetPmuLed'
     EMOJI_SRV = '/aimdk_5Fmsgs/srv/PlayEmoji'
     TOUCH_TOPIC = '/aima/hal/sensor/touch_head'
+    # Front RGB-D camera, MJPEG — read-only, used by --camera-markers.
+    CAMERA_TOPIC = '/aima/hal/sensor/rgbd_head_front/rgb_image/compressed'
+    CAMERA_MIN_INTERVAL = 0.5          # decode at most 2 fps
 
-    def __init__(self, bridge, mic='raw', mic_channel=None, volume=None,
-                 signals=True, touch=True):
+    def __init__(self, bridge, mic='vad', mic_channel=None, mic_stream=0,
+                 volume=None, signals=True, touch=True, camera_markers=False):
         self._bridge = bridge
         self._mic_mode = mic
         self._mic_channel = mic_channel
+        # 0 = lock onto the first stream_id seen (org bridge behaviour);
+        # a fixed value pins one stream (1 built-in, 2 external).
+        self._stream_lock = mic_stream or None
+        # Unique package name per run, like the org bridge: playback + focus
+        # ownership are attributed to it and it bases the playback token.
+        self._pkg = f'{PKG_NAME}-{os.getpid()}'
+        self._token = 0
         self._volume = volume
         self._signals = signals
         self._touch = touch
+        self._camera_markers = camera_markers
+        self._cam_last = 0.0
+        self._cv2 = None
+        self._aruco = None
+        self._markers = MarkerTracker()
         self._touch_debounce = Debouncer(TOUCH_DEBOUNCE_SECONDS)
         self._phase = None
         self._led_client = None
@@ -500,8 +598,8 @@ class RobotIO:
         from rclpy.qos import (QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile,
                                QoSReliabilityPolicy)
         from aimdk_msgs.msg import (AudioCapture, AudioPlayback,
-                                    PlayStateChange, ProcessedAudioOutput,
-                                    TouchState)
+                                    FocusResponse, PlayStateChange,
+                                    ProcessedAudioOutput, TouchState)
         from aimdk_msgs.srv import (AbandonAudioFocus, PlayEmoji, RequestAudioFocus,
                                     SetPmuLed, SetVolume, StopAudioPlay)
         self._msg = dict(AudioPlayback=AudioPlayback)
@@ -521,6 +619,8 @@ class RobotIO:
         self._spin_thread.start()
 
         self._pub = self._publisher(AudioPlayback, self.PLAYBACK_TOPIC, 10)
+        self._subscription(FocusResponse, self.FOCUS_RESPONSE_TOPIC,
+                           self._on_focus, 10)
         self._subscription(
             PlayStateChange, self.PLAY_STATE_TOPIC, self._on_play_state,
             QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=10,
@@ -547,6 +647,9 @@ class RobotIO:
 
         if self._touch:
             self._subscription(TouchState, self.TOUCH_TOPIC, self._on_touch, 10)
+        if self._camera_markers:
+            self._start_camera(qos_class=QoSProfile, history=QoSHistoryPolicy,
+                               reliability=QoSReliabilityPolicy)
         if self._signals:
             self._led_client = self._client(SetPmuLed, self.LED_SRV)
             self._emoji_client = self._client(PlayEmoji, self.EMOJI_SRV)
@@ -583,10 +686,17 @@ class RobotIO:
     def _requester(self):
         from aimdk_msgs.msg import FocusRequester
         requester = FocusRequester()
-        requester.pkg_name = PKG_NAME
+        requester.pkg_name = self._pkg
         requester.priority = FOCUS_PRIORITY
         requester.priority_weight = 0
         return requester
+
+    def _on_focus(self, msg):
+        """focus_response: re-request if we lose playback focus (org bridge)."""
+        if getattr(msg, 'pkg_name', None) == self._pkg and \
+                not getattr(msg, 'focus_gain', True):
+            self._bridge.log('FOCUS: lost, re-requesting')
+            threading.Thread(target=self._request_focus, daemon=True).start()
 
     def _request_focus(self):
         if not self._focus_client.wait_for_service(timeout_sec=5.0):
@@ -679,6 +789,14 @@ class RobotIO:
         self._bridge.log(f'PLAYSTATE: pkg={msg.pkg_name} state={state}')
 
     def _on_vad_audio(self, msg):
+        """VAD mic stream. Locks onto the first stream_id seen (or the one
+        pinned by --mic-stream) and drops frames from any other stream."""
+        stream_id = getattr(msg, 'stream_id', 0)
+        if self._stream_lock is None:
+            self._stream_lock = stream_id
+            self._bridge.log(f'MIC: locked onto stream_id {stream_id}')
+        if stream_id != self._stream_lock:
+            return
         self._bridge.feed_mic(bytes(msg.audio_data))
 
     def _on_raw_audio(self, msg):
@@ -691,16 +809,77 @@ class RobotIO:
         if mono:
             self._bridge.feed_mic(mono)
 
+    # --- camera markers (read-only, --camera-markers) -------------------------
+
+    def _start_camera(self, qos_class, history, reliability):
+        try:
+            import cv2
+            import numpy as np
+            from sensor_msgs.msg import CompressedImage
+        except ImportError as error:
+            self._bridge.log(
+                f'CAMERA: markers disabled ({error}); install '
+                'opencv-contrib-python-headless + numpy in the container')
+            self._camera_markers = False
+            return
+        self._cv2, self._np = cv2, np
+        aruco = cv2.aruco
+        dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+        if hasattr(aruco, 'ArucoDetector'):
+            self._detector = aruco.ArucoDetector(
+                dictionary, aruco.DetectorParameters())
+            self._aruco_dict = None
+        else:   # OpenCV < 4.7
+            self._detector = None
+            self._aruco_dict = dictionary
+        # SensorDataQoS: best_effort + volatile + keep last 5
+        qos = qos_class(history=history.KEEP_LAST, depth=5,
+                        reliability=reliability.BEST_EFFORT)
+        self._subscription(CompressedImage, self.CAMERA_TOPIC,
+                           self._on_camera, qos)
+        self._bridge.log('CAMERA: ArUco markers on RGB-D front camera '
+                         '(read-only, <=2 fps)')
+
+    def _on_camera(self, msg):
+        now = time.monotonic()
+        if now - self._cam_last < self.CAMERA_MIN_INTERVAL:
+            return
+        self._cam_last = now
+        cv2, np = self._cv2, self._np
+        try:
+            frame = cv2.imdecode(
+                np.frombuffer(bytes(msg.data), np.uint8),
+                cv2.IMREAD_GRAYSCALE)
+        except Exception:
+            return
+        if frame is None:
+            return
+        if self._detector is not None:
+            _, ids, _ = self._detector.detectMarkers(frame)
+        else:
+            _, ids, _ = cv2.aruco.detectMarkers(frame, self._aruco_dict)
+        ids = [] if ids is None else [int(i) for i in ids.flatten()]
+        marker = self._markers.note(ids, now)
+        if marker is not None:
+            label = MARKER_LABELS[marker]
+            self._bridge.log(f'CAMERA: sees marker {marker} = {label}')
+            self._bridge.send_contextual(
+                f'Robot camera sees the marker for {label} '
+                f'(id {marker}).')
+
     def play(self, chunk):
         playback = self._msg['AudioPlayback']()
-        playback.pkg_name = PKG_NAME
-        playback.token_id = PKG_NAME
+        playback.pkg_name = self._pkg
+        playback.token_id = f'{self._pkg}-{self._token}'
         playback.info.channels = 1
         playback.info.sample_rate = RATE
         playback.data.data = list(chunk)
         self._pub.publish(playback)
 
     def stop_playback(self):
+        # A new token_id clears the robot's playback buffer (per the docs);
+        # StopAudioPlay halts whatever is already sounding.
+        self._token += 1
         if self._stop_client is None:
             return
         try:
@@ -737,6 +916,11 @@ class Bridge:
     def __init__(self, args, log=None):
         self.site = args.url.rstrip('/')
         self.code = args.code or os.environ.get('NAVIGATOR_ACCESS_CODE', '')
+        self.session_mode = getattr(args, 'session', 'auto')
+        self.agent_id = (getattr(args, 'agent_id', None)
+                         or os.environ.get('ELEVENLABS_AGENT_ID')
+                         or PROD_AGENT_ID)
+        self.api_key = os.environ.get('ELEVENLABS_API_KEY', '').strip()
         self.half_duplex = args.half_duplex
         self._log_lines = []
         self._log_lock = threading.Lock()
@@ -908,6 +1092,9 @@ class Bridge:
         except Exception:
             return False
 
+    def send_contextual(self, text):
+        return self._send({'type': 'contextual_update', 'text': text})
+
     def on_event(self, event):
         """One parsed server message. Mirrors app/static/voice.mjs handling."""
         kind = event.get('type') if isinstance(event, dict) else None
@@ -1024,10 +1211,19 @@ class Bridge:
         self._close_ws()
         self.connected = False
 
+    def _session_url(self):
+        return session_url(self.session_mode, self.site, self.code,
+                           self.agent_id, self.api_key, log=self.log)
+
     def run(self):
-        if not self.code:
+        need_code = self.session_mode == 'site' or \
+            (self.session_mode == 'auto' and not self.api_key)
+        if need_code and not self.code:
             self.log('ERROR: no access code (--code or NAVIGATOR_ACCESS_CODE)')
             return 2
+        if self.session_mode == 'direct' and not self.api_key:
+            self.log('SESSION: direct without ELEVENLABS_API_KEY — '
+                     'works only if the agent is public')
         if self.io:
             try:
                 self.io.start()
@@ -1048,7 +1244,7 @@ class Bridge:
             self.negotiated.clear()
             self.clear_playback()
             try:
-                url = request_signed_url(self.site, self.code)
+                url = self._session_url()
             except Exception as error:
                 self.log(f'SESSION: signed URL request failed: {error}')
                 url = None
@@ -1133,6 +1329,227 @@ class Bridge:
         self.log('bridge stopped')
 
 
+def fmt_check(name, ok, detail=''):
+    return f"{'PASS' if ok else 'FAIL'}  {name}{(' — ' + detail) if detail else ''}"
+
+
+def _reachable(url):
+    """True when the host answers over HTTPS (any status counts)."""
+    try:
+        urllib.request.urlopen(url, timeout=8)
+        return True
+    except urllib.error.HTTPError:
+        return True
+    except Exception:
+        return False
+
+
+def run_preflight(args):
+    """On-robot checklist: prints PASS/FAIL lines and exits. One ROS node,
+    read-only subscriptions plus a short speaker test."""
+    results = []
+
+    def check(name, ok, detail=''):
+        results.append((name, ok, detail))
+        print(fmt_check(name, ok, detail), flush=True)
+
+    check('python', sys.version_info >= (3, 8), sys.version.split()[0])
+    modules = [('websocket', True), ('numpy', False)]
+    if getattr(args, 'camera_markers', False):
+        modules.append(('cv2', True))
+    for mod, required in modules:
+        try:
+            __import__(mod)
+            check(f'import {mod}', True)
+        except ImportError:
+            check(f'import {mod}', not required,
+                  'missing' if required else 'missing (not needed by robot path)')
+    ros_ok = False
+    try:
+        import rclpy  # noqa: F401
+        import aimdk_msgs  # noqa: F401
+        ros_ok = True
+        check('import rclpy + aimdk_msgs', True)
+    except ImportError as error:
+        check('import rclpy + aimdk_msgs', False, str(error))
+
+    check('https api.elevenlabs.io', _reachable('https://api.elevenlabs.io/'))
+    check('https session site', _reachable(args.url))
+
+    site = args.url.rstrip('/')
+    code = args.code or os.environ.get('NAVIGATOR_ACCESS_CODE', '')
+    agent_id = (args.agent_id or os.environ.get('ELEVENLABS_AGENT_ID')
+                or PROD_AGENT_ID)
+    api_key = os.environ.get('ELEVENLABS_API_KEY', '').strip()
+    url = None
+    try:
+        url = session_url(args.session, site, code, agent_id, api_key,
+                          log=lambda *a: None)
+        check('signed session url', True,
+              f'{args.session} path')
+    except Exception as error:
+        check('signed session url', False, str(error)[:120])
+
+    if not ros_ok:
+        for name in ('ros topics', 'mic stream', 'audio focus', 'speaker test'):
+            check(name, False, 'skipped (no rclpy)')
+    else:
+        _preflight_ros(args, check)
+
+    if url:
+        _preflight_socket(url, check)
+    else:
+        check('agent websocket', False, 'skipped (no session url)')
+
+    failed = sum(1 for _, ok, _ in results if not ok)
+    print(f'-- preflight: {len(results) - failed} PASS, {failed} FAIL --')
+    return 1 if failed else 0
+
+
+def _preflight_ros(args, check):
+    import rclpy
+    from rclpy.qos import (QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile,
+                           QoSReliabilityPolicy)
+    from aimdk_msgs.msg import AudioPlayback, ProcessedAudioOutput
+    from aimdk_msgs.srv import RequestAudioFocus, StopAudioPlay
+
+    if not rclpy.ok():
+        rclpy.init()
+    node = rclpy.create_node('navigator_preflight')
+    pkg = f'{PKG_NAME}-preflight-{os.getpid()}'
+    try:
+        names = {n for n, _ in node.get_topic_names_and_types()}
+        topics = [RobotIO.PROCESSED_TOPIC, RobotIO.PLAYBACK_TOPIC]
+        if getattr(args, 'camera_markers', False):
+            topics.append(RobotIO.CAMERA_TOPIC)
+        for topic in topics:
+            check(f'topic {topic}', topic in names)
+        slam = sorted(n for n in names if n.startswith(('/slam', '/localization')))
+        check('slam/localization topics (info)', True,
+              ', '.join(slam) if slam else 'none publishing')
+
+        # Mic: listen on the VAD stream for 5 s.
+        stats = {'count': 0, 'streams': set(), 'vad_begin': False}
+        qos = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=500,
+                         reliability=QoSReliabilityPolicy.BEST_EFFORT,
+                         durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+
+        def on_mic(msg):
+            stats['count'] += 1
+            stats['streams'].add(getattr(msg, 'stream_id', 0))
+            state = getattr(getattr(msg, 'audio_vad_state', None), 'value', None)
+            if state == 1:   # AUDIO_VAD_STATE_BEGIN
+                stats['vad_begin'] = True
+
+        node.create_subscription(ProcessedAudioOutput,
+                                 RobotIO.PROCESSED_TOPIC, on_mic, qos)
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            rclpy.spin_once(node, timeout_sec=0.1)
+        if stats['count']:
+            check('mic stream (/agent/process_audio_output)', True,
+                  f"{stats['count']} msgs in 5s, stream_ids "
+                  f"{sorted(stats['streams'])}, vad_begin={stats['vad_begin']}")
+        else:
+            check('mic stream (/agent/process_audio_output)', False,
+                  'no messages in 5s — is the robot in voice-only mode? '
+                  'say the wake word once')
+
+        # Focus + speaker: request focus, play back_en.pcm, release.
+        focus_client = node.create_client(RequestAudioFocus, RobotIO.FOCUS_SRV)
+        gained = False
+        if focus_client.wait_for_service(timeout_sec=5.0):
+            from aimdk_msgs.msg import FocusRequester
+            request = RequestAudioFocus.Request()
+            request.focus_requester = FocusRequester(
+                pkg_name=pkg, priority=FOCUS_PRIORITY)
+            try:
+                future = focus_client.call_async(request)
+                deadline = time.monotonic() + 4.0
+                while not future.done() and time.monotonic() < deadline:
+                    rclpy.spin_once(node, timeout_sec=0.05)
+                if future.done():
+                    response = future.result()
+                    gained = bool(response and response.focus_response.focus_gain)
+            except Exception:
+                pass
+        check('audio focus (RequestAudioFocus)', gained,
+              f'priority {FOCUS_PRIORITY}' if gained else 'not granted — '
+              'playback may mix or stay silent')
+
+        clip = os.path.join(PHRASE_DIR, 'back_en.pcm')
+        try:
+            with open(clip, 'rb') as fh:
+                pcm = fh.read()
+        except OSError:
+            pcm = b''
+        if pcm:
+            pub = node.create_publisher(AudioPlayback,
+                                        RobotIO.PLAYBACK_TOPIC, 10)
+            time.sleep(0.3)   # let the subscriber match
+            sent = 0
+            for i in range(0, len(pcm), CHUNK_BYTES):
+                msg = AudioPlayback()
+                msg.pkg_name = pkg
+                msg.token_id = f'{pkg}-0'
+                msg.info.channels = 1
+                msg.info.sample_rate = RATE
+                msg.data.data = list(pcm[i:i + CHUNK_BYTES])
+                pub.publish(msg)
+                sent += CHUNK_BYTES
+                rclpy.spin_once(node, timeout_sec=0.05)
+            check('speaker test (played back_en.pcm)', True,
+                  f'{len(pcm)} bytes — did you hear "I\'m back…"?')
+            stop_client = node.create_client(StopAudioPlay, RobotIO.STOP_SRV)
+            if stop_client.wait_for_service(timeout_sec=1.0):
+                stop_client.call_async(StopAudioPlay.Request())
+        else:
+            check('speaker test (played back_en.pcm)', False,
+                  'phrases/back_en.pcm missing — run make_phrases.py')
+    finally:
+        node.destroy_node()
+
+
+def _preflight_socket(url, check):
+    """Connect like the real run: negotiate pcm_16000 and receive the first
+    agent audio."""
+    import websocket
+    got = {'meta': False, 'audio': False, 'format': ''}
+    try:
+        ws = websocket.create_connection(url, subprotocols=['convai'],
+                                         timeout=SOCKET_TIMEOUT,
+                                         skip_utf8_validation=True)
+    except Exception as error:
+        check('agent websocket', False, f'connect: {error}')
+        return
+    try:
+        ws.send(json.dumps({'type': 'conversation_initiation_client_data'}))
+        ws.settimeout(12.0)
+        deadline = time.monotonic() + 12.0
+        while time.monotonic() < deadline and not got['audio']:
+            try:
+                event = json.loads(ws.recv())
+            except Exception:
+                break
+            if event.get('type') == 'ping':
+                ws.send(json.dumps({'type': 'pong',
+                                    'event_id': event['ping_event']['event_id']}))
+            elif event.get('type') == 'conversation_initiation_metadata':
+                meta = event['conversation_initiation_metadata_event']
+                got['meta'] = True
+                got['format'] = meta.get('agent_output_audio_format', '')
+            elif event.get('type') == 'audio':
+                got['audio'] = True
+    finally:
+        try:
+            ws.close()
+        except Exception:
+            pass
+    check('agent websocket (first audio)', got['audio'],
+          got['format'] if got['audio'] else
+          ('connected but no audio in 12s' if got['meta'] else 'no metadata'))
+
+
 def main(argv=None):
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -1141,10 +1558,19 @@ def main(argv=None):
             pass
     parser = argparse.ArgumentParser(description='Robot audio bridge for the navigator agent')
     parser.add_argument('--io', choices=sorted(IOS), default='robot')
-    parser.add_argument('--mic', choices=['raw', 'vad'], default='raw',
-                        help='robot mic source (raw capture topic or VAD-processed topic)')
+    parser.add_argument('--mic', choices=['raw', 'vad'], default='vad',
+                        help='robot mic source (VAD stream after wake word, or raw capture topic)')
     parser.add_argument('--mic-channel', type=int, default=None,
                         help='use a single raw mic channel instead of averaging')
+    parser.add_argument('--mic-stream', type=int, default=0,
+                        help='VAD mic stream to use (0 = first seen, 1 built-in, 2 external)')
+    parser.add_argument('--session', choices=['auto', 'site', 'direct'], default='auto',
+                        help='auto: our /api/session then direct ElevenLabs fallback; '
+                             'direct: get-signed-url with ELEVENLABS_API_KEY')
+    parser.add_argument('--agent-id', default=None,
+                        help='agent for --session direct (or ELEVENLABS_AGENT_ID)')
+    parser.add_argument('--preflight', action='store_true',
+                        help='run the on-robot checklist and exit (no conversation)')
     parser.add_argument('--code', default=None, help='access code (or NAVIGATOR_ACCESS_CODE)')
     parser.add_argument('--url', default=DEFAULT_SITE, help='site base URL')
     parser.add_argument('--volume', type=int, default=None,
@@ -1154,21 +1580,30 @@ def main(argv=None):
     duplex.add_argument('--full-duplex', dest='half_duplex', action='store_false')
     parser.add_argument('--no-signals', action='store_true',
                         help='robot only: disable LED strip + screen emoji phase signals')
+    parser.add_argument('--camera-markers', action='store_true',
+                        help='read-only ArUco marker sightings on the RGB-D '
+                             'front camera, sent to the agent as '
+                             'contextual_update (needs cv2 in the container)')
     parser.add_argument('--no-touch', action='store_true',
                         help='robot only: disable head-touch fresh take')
     parser.add_argument('--log-dir', default=os.path.join(os.path.dirname(__file__), 'logs'))
     args = parser.parse_args(argv)
 
     if args.half_duplex is None:
-        args.half_duplex = args.io == 'robot'
+        args.half_duplex = False   # org bridge default; --half-duplex opts in
+
+    if args.preflight:
+        return run_preflight(args)
 
     stamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     args.log_file = os.path.join(args.log_dir, f'{stamp}.log')
     args.latency_csv = os.path.join(args.log_dir, f'latency-{stamp}.csv')
     if args.io == 'robot':
         args.io_backend = lambda bridge: RobotIO(
-            bridge, mic=args.mic, mic_channel=args.mic_channel, volume=args.volume,
-            signals=not args.no_signals, touch=not args.no_touch)
+            bridge, mic=args.mic, mic_channel=args.mic_channel,
+            mic_stream=args.mic_stream, volume=args.volume,
+            signals=not args.no_signals, touch=not args.no_touch,
+            camera_markers=args.camera_markers)
     else:
         args.io_backend = IOS[args.io]
 
