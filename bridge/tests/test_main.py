@@ -181,3 +181,80 @@ def test_a_setup_mistake_gives_a_clear_error_not_a_traceback(monkeypatch, capsys
         monkeypatch.delenv(name, raising=False)
     assert entry.main(["--adapter", "laptop"]) == 2
     assert "BRIDGE_ACCESS_CODE" in capsys.readouterr().err
+
+
+# --------------------------------------------------- robot defaults (raw mic, half duplex)
+def test_robot_defaults_are_the_raw_mic_and_half_duplex():
+    config, extras = entry.load_settings(None, env={}, adapter="ros")
+    assert config.mic_gate == "half_duplex" and extras["ros_mic_source"] == "raw"
+
+
+def test_other_adapters_keep_the_open_mic():
+    for adapter in (None, "laptop", "wav"):
+        config, _ = entry.load_settings(None, env={}, adapter=adapter)
+        assert config.mic_gate == "none"
+
+
+def test_the_example_config_gives_the_robot_defaults_and_the_laptop_an_open_mic():
+    path = str(BRIDGE_DIR / "config.example.json")
+    config, extras = entry.load_settings(path, env={}, adapter="ros")
+    assert config.mic_gate == "half_duplex" and extras["ros_mic_source"] == "raw"
+    config, _ = entry.load_settings(path, env={}, adapter="laptop")
+    assert config.mic_gate == "none"
+
+
+def test_config_file_and_environment_can_change_the_robot_defaults(tmp_path):
+    path = tmp_path / "c.json"
+    path.write_text(json.dumps({"mic_gate": "none", "ros_mic_source": "wake_word"}))
+    config, extras = entry.load_settings(str(path), env={}, adapter="ros")
+    assert config.mic_gate == "none" and extras["ros_mic_source"] == "wake_word"
+    config, extras = entry.load_settings(None, env={"BRIDGE_MIC_GATE": "none",
+                                                    "BRIDGE_ROS_MIC_SOURCE": "wake_word"}, adapter="ros")
+    assert config.mic_gate == "none" and extras["ros_mic_source"] == "wake_word"
+
+
+def test_organiser_half_duplex_variable_works_both_ways_on_the_robot():
+    config, _ = entry.load_settings(None, env={"HALF_DUPLEX": "1"}, adapter="ros")
+    assert config.mic_gate == "half_duplex"
+    config, _ = entry.load_settings(None, env={"HALF_DUPLEX": "0"}, adapter="ros")
+    assert config.mic_gate == "none"
+    # our own variable is stronger than the organisers' one
+    config, _ = entry.load_settings(None, env={"HALF_DUPLEX": "0", "BRIDGE_MIC_GATE": "half_duplex"},
+                                    adapter="ros")
+    assert config.mic_gate == "half_duplex"
+
+
+def test_the_ros_adapter_is_built_with_the_chosen_mic_source():
+    extras = dict(entry.EXTRA_DEFAULTS)
+    source, sink = entry.build_adapters("ros", extras)
+    assert source is sink and source.mic_source == "raw"
+    extras["ros_mic_source"] = "wake_word"
+    assert entry.build_adapters("ros", extras)[0].mic_source == "wake_word"
+
+
+def test_a_wrong_mic_source_is_a_clear_start_error(monkeypatch, capsys):
+    monkeypatch.setenv("BRIDGE_ACCESS_CODE", "team-code")
+    monkeypatch.setenv("BRIDGE_ROS_MIC_SOURCE", "loud")
+    assert entry.main(["--adapter", "ros"]) == 2
+    assert "mic_source" in capsys.readouterr().err
+
+
+def test_the_command_line_uses_the_robot_defaults_for_the_ros_adapter(monkeypatch):
+    for name in ("BRIDGE_MIC_GATE", "HALF_DUPLEX", "BRIDGE_ROS_MIC_SOURCE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("BRIDGE_ACCESS_CODE", "team-code")
+    seen = {}
+
+    class StopAtOnce:
+        def __init__(self, source, sink, provider, config, **hooks):
+            seen["config"] = config
+
+        async def run(self):
+            pass
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(entry, "SessionCore", StopAtOnce)
+    assert entry.main(["--adapter", "ros"]) == 0
+    assert seen["config"].mic_gate == "half_duplex"

@@ -8,7 +8,11 @@ Settings come from the config file, then from environment variables named BRIDGE
     ELEVENLABS_AGENT_ID   + ELEVENLABS_API_KEY: ask ElevenLabs for the signed URL directly (fallback).
     ELEVENLABS_AGENT_ID   alone: a public agent, no key needed.
 
-The organisers' names still work: HALF_DUPLEX=1, MIC_STREAM=1|2, VERBOSE=1.
+The organisers' names still work: HALF_DUPLEX=1 (or 0), MIC_STREAM=1|2, VERBOSE=1.
+
+With --adapter ros the defaults are the raw microphone (ros_mic_source = raw) and half duplex
+(mic_gate = half_duplex), because the raw mic has no echo cancellation. The config file and the
+BRIDGE_* variables can change both. Other adapters keep mic_gate = none.
 """
 from __future__ import annotations
 
@@ -39,9 +43,13 @@ SIGNED_URL_HOSTS = {"api.elevenlabs.io", "api.us.elevenlabs.io", "api.eu.residen
                     "api.in.residency.elevenlabs.io", "api.sg.residency.elevenlabs.io"}
 
 # Settings that belong to the adapters and the start-up, not to SessionCore.
-EXTRA_DEFAULTS = {"site_url": DEFAULT_SITE, "ros_mic_stream": 0, "ros_lead_s": 0.3,
-                  "wav_in": "", "wav_out": "out.wav", "wav_realtime": True,
+EXTRA_DEFAULTS = {"site_url": DEFAULT_SITE, "ros_mic_source": "raw", "ros_mic_stream": 0,
+                  "ros_lead_s": 0.3, "wav_in": "", "wav_out": "out.wav", "wav_realtime": True,
                   "laptop_input_device": "", "laptop_output_device": ""}
+
+# Config defaults that apply only with --adapter ros. They sit below the config file and the
+# BRIDGE_* variables. (The raw mic has no echo cancellation, so the robot must not hear itself.)
+ROBOT_CONFIG_DEFAULTS = {"mic_gate": "half_duplex"}
 
 
 class SetupError(RuntimeError):
@@ -57,8 +65,8 @@ def _parse_like(default, text: str):
     """Turn an environment string into the same type as the default value."""
     if isinstance(default, bool):
         return text.strip().lower() in ("1", "true", "yes", "on")
-    if text.strip().lower() == "none":
-        return None
+    if text.strip().lower() == "none" and not isinstance(default, str):
+        return None                       # "none" means "off" for numbers; for text it is a value (mic_gate)
     if isinstance(default, int):
         return int(text)
     if isinstance(default, float):
@@ -68,8 +76,9 @@ def _parse_like(default, text: str):
     return text
 
 
-def load_settings(config_path, env=None):
-    """Returns (Config, extras). Defaults < config file < BRIDGE_* environment variables."""
+def load_settings(config_path, env=None, adapter=None):
+    """Returns (Config, extras). Defaults < robot defaults (adapter "ros" only) < config file
+    < BRIDGE_* environment variables."""
     env = os.environ if env is None else env
     config_defaults = {f.name: f.default for f in fields(Config)}
     file_values = {}
@@ -79,7 +88,8 @@ def load_settings(config_path, env=None):
     unknown = sorted(set(file_values) - set(config_defaults) - set(EXTRA_DEFAULTS))
     if unknown:
         raise ValueError("unknown config key(s): " + ", ".join(unknown))
-    config_values = {k: v for k, v in file_values.items() if k in config_defaults}
+    config_values = dict(ROBOT_CONFIG_DEFAULTS) if adapter == "ros" else {}
+    config_values.update({k: v for k, v in file_values.items() if k in config_defaults})
     extras = dict(EXTRA_DEFAULTS)
     extras.update({k: v for k, v in file_values.items() if k in EXTRA_DEFAULTS})
 
@@ -92,8 +102,11 @@ def load_settings(config_path, env=None):
         if text.strip():
             extras[name] = _parse_like(default, text)
     # The organisers' own variable names.
-    if env.get("HALF_DUPLEX", "") == "1" and not env.get("BRIDGE_MIC_GATE", "").strip():
-        config_values["mic_gate"] = "half_duplex"
+    if not env.get("BRIDGE_MIC_GATE", "").strip():
+        if env.get("HALF_DUPLEX", "") == "1":
+            config_values["mic_gate"] = "half_duplex"
+        elif env.get("HALF_DUPLEX", "") == "0":
+            config_values["mic_gate"] = "none"          # switch the robot default off
     if env.get("MIC_STREAM", "").strip() and not env.get("BRIDGE_ROS_MIC_STREAM", "").strip():
         extras["ros_mic_stream"] = int(env["MIC_STREAM"])
     return Config.from_dict(config_values), extras
@@ -196,7 +209,8 @@ def build_adapters(name: str, extras: dict):
     """Returns (source, sink). The robot and laptop adapters are one object doing both."""
     if name == "ros":
         from .ros_adapter import RosAdapter
-        adapter = RosAdapter(mic_stream=extras["ros_mic_stream"], lead_s=extras["ros_lead_s"])
+        adapter = RosAdapter(mic_stream=extras["ros_mic_stream"], lead_s=extras["ros_lead_s"],
+                             mic_source=extras["ros_mic_source"])
         return adapter, adapter
     if name == "laptop":
         from .laptop_adapter import LaptopAdapter
@@ -237,7 +251,7 @@ def main(argv=None) -> int:
                         else logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         datefmt="%H:%M:%S")
     try:
-        config, extras = load_settings(args.config)
+        config, extras = load_settings(args.config, adapter=args.adapter)
         if args.wav_in:
             extras["wav_in"] = args.wav_in
         if args.wav_out:

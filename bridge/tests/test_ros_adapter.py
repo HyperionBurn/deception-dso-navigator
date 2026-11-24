@@ -1,5 +1,7 @@
 """ROS adapter tests. No ROS is installed here: a small fake rclpy / aimdk_msgs stands in for it."""
 import asyncio
+import random
+import struct
 import subprocess
 import sys
 import threading
@@ -162,7 +164,8 @@ def make_fake_ros(monkeypatch, world):
     module("rclpy.signals", SignalHandlerOptions=SimpleNamespace(NO=0))
     rclpy.executors = sys.modules["rclpy.executors"]
     module("aimdk_msgs")
-    module("aimdk_msgs.msg", AudioData=Message, AudioInfo=Message, AudioPlayback=Message,
+    module("aimdk_msgs.msg", AudioCapture=Message, AudioData=Message, AudioInfo=Message,
+           AudioPlayback=Message,
            AudioVadStateType=SimpleNamespace(AUDIO_VAD_STATE_BEGIN=1),
            CommonState=SimpleNamespace(SUCCESS=SUCCESS), FocusRequester=Message,
            FocusResponse=Message, ProcessedAudioOutput=Message)
@@ -190,16 +193,18 @@ def mic_message(stream_id, first_byte=1, vad=0):
 
 
 # ------------------------------------------------------------ the adapter on the fake
-def test_adapter_creates_only_the_audio_endpoints_and_checks_each_name_first(world):
+@pytest.mark.parametrize("source, mic_topic", [("wake_word", ros_adapter.MIC_TOPIC),
+                                               ("raw", ros_adapter.RAW_MIC_TOPIC)])
+def test_adapter_creates_only_the_audio_endpoints_and_checks_each_name_first(world, source, mic_topic):
     async def scenario():
-        adapter = ros_adapter.RosAdapter(poll_s=0.005)
+        adapter = ros_adapter.RosAdapter(poll_s=0.005, mic_source=source)
         await adapter.start()
         await adapter.close()
 
     asyncio.run(scenario())
     created = [(e[1], e[2]) for e in world.log if e[0] == "create"]
     assert sorted(created) == sorted([
-        ("subscription", ros_adapter.MIC_TOPIC),
+        ("subscription", mic_topic),
         ("subscription", ros_adapter.FOCUS_RESPONSE_TOPIC),
         ("publisher", ros_adapter.PLAYBACK_TOPIC),
         ("client", ros_adapter.REQUEST_FOCUS_SERVICE),
@@ -226,7 +231,7 @@ def test_a_forbidden_name_is_refused_before_anything_is_created(world):
 
 def test_mic_audio_comes_out_in_100ms_chunks_and_silence_when_quiet(world):
     async def scenario():
-        adapter = ros_adapter.RosAdapter(poll_s=0.005)
+        adapter = ros_adapter.RosAdapter(poll_s=0.005, mic_source="wake_word")
         await adapter.start()
         presence = []
         adapter.on_presence = lambda: presence.append(True)
@@ -246,7 +251,7 @@ def test_mic_audio_comes_out_in_100ms_chunks_and_silence_when_quiet(world):
 
 def test_robot_voice_activity_counts_as_presence(world):
     async def scenario():
-        adapter = ros_adapter.RosAdapter(poll_s=0.005)
+        adapter = ros_adapter.RosAdapter(poll_s=0.005, mic_source="wake_word")
         await adapter.start()
         presence = []
         adapter.on_presence = lambda: presence.append(True)
@@ -289,3 +294,145 @@ def test_adapter_takes_the_speaker_focus_at_start_and_gives_it_back(world):
         assert ("call", ros_adapter.ABANDON_FOCUS_SERVICE) in world.log
 
     asyncio.run(scenario())
+
+
+# ------------------------------------------------------------ raw microphone (the default)
+def pack(samples):
+    return struct.pack("<%dh" % len(samples), *samples)
+
+
+def unpack(pcm):
+    return list(struct.unpack("<%dh" % (len(pcm) // 2), pcm))
+
+
+def capture_message(samples, channels, mic_channels, rate=16000):
+    """What /aima/hal/audio/capture gives: msg.data.data, msg.info.channels, msg.mic_channels."""
+    return SimpleNamespace(data=SimpleNamespace(data=pack(samples)),
+                           info=SimpleNamespace(channels=channels, sample_rate=rate),
+                           mic_channels=mic_channels)
+
+
+def test_the_default_mic_source_is_raw_and_a_bad_one_is_refused():
+    assert ros_adapter.RosAdapter().mic_source == "raw"
+    assert ros_adapter.RosAdapter(mic_source="wake_word").mic_source == "wake_word"
+    with pytest.raises(ValueError, match="mic_source"):
+        ros_adapter.RosAdapter(mic_source="loud")
+
+
+def test_downmix_stereo_averages_the_two_mics():
+    pcm = ros_adapter.downmix_to_mono(pack([100, 200, -100, -300, 7, 8]), channels=2, mic_channels=2)
+    assert unpack(pcm) == [150, -200, 7]                  # (7 + 8) / 2 = 7.5 -> 7
+
+
+def test_downmix_six_channels_uses_only_the_real_mics():
+    # 4 mics, then 2 speaker-reference channels that are very loud and must be ignored.
+    frame_a = [10, 20, 30, 41, 9999, -9999]              # mean of the mics 25.25 -> 25
+    frame_b = [-10, -20, -30, -41, 9999, 9999]           # mean -25.25 -> -25 (towards zero, not -26)
+    pcm = ros_adapter.downmix_to_mono(pack(frame_a + frame_b), channels=6, mic_channels=4)
+    assert unpack(pcm) == [25, -25]
+
+
+def test_downmix_with_one_mic_keeps_the_first_channel_only():
+    pcm = ros_adapter.downmix_to_mono(pack([5, 900, 6, 900, 7, 900]), channels=2, mic_channels=1)
+    assert unpack(pcm) == [5, 6, 7]
+
+
+def test_downmix_of_a_mono_message_is_a_plain_copy():
+    pcm = ros_adapter.downmix_to_mono(pack([1, -2, 32767, -32768]), channels=1, mic_channels=1)
+    assert unpack(pcm) == [1, -2, 32767, -32768]
+
+
+def test_downmix_extreme_values_do_not_wrap_around():
+    loud = [32767] * 4
+    low = [-32768] * 4
+    mixed = [32767, 32767, -32768, -32768]               # sum -2, mean -0.5 -> 0
+    pcm = ros_adapter.downmix_to_mono(pack(loud + low + mixed), channels=4, mic_channels=4)
+    assert unpack(pcm) == [32767, -32768, 0]
+
+
+def test_downmix_odd_or_partial_data_drops_the_broken_tail_and_never_raises():
+    two_frames = pack(list(range(1, 13)))                # 2 frames of 6 channels
+    for tail in (b"\x01", pack([5, 5, 5]), pack([5, 5, 5]) + b"\x01"):
+        pcm = ros_adapter.downmix_to_mono(two_frames + tail, channels=6, mic_channels=4)
+        assert unpack(pcm) == [2, 8]                     # (1+2+3+4)/4 = 2.5 -> 2, (7+8+9+10)/4 = 8.5 -> 8
+    assert ros_adapter.downmix_to_mono(b"", channels=6, mic_channels=4) == b""
+    assert ros_adapter.downmix_to_mono(b"\x01", channels=2, mic_channels=2) == b""
+
+
+def test_downmix_clamps_a_strange_mic_channels_value():
+    data = pack([1, 2, 3, 4, 5, 6])
+    assert unpack(ros_adapter.downmix_to_mono(data, channels=6, mic_channels=99)) == [3]    # all 6
+    assert unpack(ros_adapter.downmix_to_mono(data, channels=6, mic_channels=0)) == [1]     # first only
+    assert unpack(ros_adapter.downmix_to_mono(data, channels=6, mic_channels=-3)) == [1]
+    with pytest.raises(ValueError, match="channels"):
+        ros_adapter.downmix_to_mono(data, channels=0, mic_channels=1)
+
+
+@pytest.mark.parametrize("channels, mic_channels", [(1, 1), (2, 2), (2, 1), (6, 4), (6, 6), (4, 3)])
+def test_downmix_matches_the_organisers_numpy_code(channels, mic_channels):
+    np = pytest.importorskip("numpy")
+    rng = random.Random(channels * 10 + mic_channels)
+    samples = [rng.choice([-32768, 32767, rng.randint(-32768, 32767)]) for _ in range(channels * 400)]
+    raw = pack(samples)
+    a = np.frombuffer(raw, dtype="<i2").reshape(-1, channels)[:, :mic_channels]
+    expected = np.clip(a.astype(np.int32).mean(axis=1), -32768, 32767).astype("<i2").tobytes()
+    assert ros_adapter.downmix_to_mono(raw, channels, mic_channels) == expected
+
+
+def test_raw_mic_chunks_are_mono_100ms_and_ignore_the_reference_channels(world):
+    frames = CHUNK_BYTES // 2                             # 1600 mono samples = 100 ms
+    samples = []
+    for _ in range(frames):
+        samples += [1000, 2000, 3000, 4000, 30000, -30000]    # 4 mics + 2 loud reference channels
+
+    async def scenario():
+        adapter = ros_adapter.RosAdapter(poll_s=0.005)    # raw is the default
+        await adapter.start()
+        presence = []
+        adapter.on_presence = lambda: presence.append(True)
+        world.subs[ros_adapter.RAW_MIC_TOPIC](capture_message(samples, channels=6, mic_channels=4))
+        first = await adapter.read_chunk()
+        second = await adapter.read_chunk()
+        await adapter.close()
+        return presence, first, second
+
+    presence, first, second = asyncio.run(scenario())
+    assert len(first) == CHUNK_BYTES and unpack(first) == [2500] * frames   # (1000+2000+3000+4000)/4
+    assert second == SILENCE
+    assert presence == []                                 # no wake-word detector here; the core listens
+
+
+def test_a_broken_raw_message_is_dropped_and_the_mic_keeps_working(world):
+    async def scenario():
+        adapter = ros_adapter.RosAdapter(poll_s=0.005)
+        await adapter.start()
+        callback = world.subs[ros_adapter.RAW_MIC_TOPIC]
+        callback(capture_message([1, 2, 3, 4], channels=0, mic_channels=0))   # nonsense: no channels
+        callback(SimpleNamespace())                                           # not even the fields
+        callback(capture_message([300] * (CHUNK_BYTES // 2), channels=1, mic_channels=1))
+        chunk = await adapter.read_chunk()
+        await adapter.close()
+        return chunk
+
+    chunk = asyncio.run(scenario())
+    assert unpack(chunk) == [300] * (CHUNK_BYTES // 2)
+
+
+def test_raw_mode_says_clearly_when_the_capture_message_type_is_missing(world, monkeypatch):
+    monkeypatch.delattr(sys.modules["aimdk_msgs.msg"], "AudioCapture")
+    adapter = ros_adapter.RosAdapter(poll_s=0.005)
+    with pytest.raises(ros_adapter.RosNotAvailable, match="AudioCapture") as caught:
+        asyncio.run(adapter.start())
+    assert "wake_word" in str(caught.value)               # tells the person how to go back
+
+
+def test_wake_word_mode_does_not_need_the_capture_message_type(world, monkeypatch):
+    monkeypatch.delattr(sys.modules["aimdk_msgs.msg"], "AudioCapture")
+
+    async def scenario():
+        adapter = ros_adapter.RosAdapter(poll_s=0.005, mic_source="wake_word")
+        await adapter.start()
+        await adapter.close()
+
+    asyncio.run(scenario())
+    assert ("create", "subscription", ros_adapter.MIC_TOPIC) in world.log

@@ -7,7 +7,6 @@
   "default_lang": "en",
   "source_label": "robot",
 
-  "mic_gate": "none",
   "echo_tail_s": 0.3,
   "speech_threshold": 500,
   "speech_min_chunks": 2,
@@ -29,6 +28,7 @@
   "latency_csv": "latency.csv",
 
   "site_url": "https://deception-dso-navigator.vercel.app",
+  "ros_mic_source": "raw",
   "ros_mic_stream": 0,
   "ros_lead_s": 0.3,
   "wav_in": "",

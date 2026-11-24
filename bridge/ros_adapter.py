@@ -4,6 +4,13 @@ UNTESTED ON A REAL ROBOT. It is kept close to the organisers' starter bridge
 (sources/organizer_docs/elevenlabs_robot_bridge.py): same topics, same message types, same
 audio-focus handling, same pacing. It was only run against a small fake ROS in the tests.
 
+Two microphone sources (setting `mic_source`):
+  * "raw" (the default on the robot): /aima/hal/audio/capture. The raw microphones, always on, no
+    wake word needed. Several channels are mixed down to one. There is NO echo cancellation, so
+    run it with mic_gate = half_duplex (the robot would hear itself otherwise).
+  * "wake_word": /agent/process_audio_output, the robot's own processed stream. It stays silent
+    until the wake word is said. This was the first version.
+
 Safety:
   * The bridge subscribes to the microphone topic and publishes ONLY to the audio playback
     topic. It also calls the three audio services (take focus, give focus back, stop playing).
@@ -21,6 +28,7 @@ import array
 import asyncio
 import logging
 import os
+import sys
 import threading
 import time
 from types import SimpleNamespace
@@ -35,13 +43,15 @@ FOCUS_PRIORITY = 8                 # same value as AgiBot's stream example
 MAX_MIC_BACKLOG = BYTES_PER_SEC    # keep at most 1 s of mic audio waiting; stale speech is useless
 
 # The only topics and services this adapter touches (names as in the organisers' file).
-MIC_TOPIC = "/agent/process_audio_output"
+MIC_TOPIC = "/agent/process_audio_output"        # mic_source "wake_word"
+RAW_MIC_TOPIC = "/aima/hal/audio/capture"        # mic_source "raw"
+MIC_SOURCES = ("raw", "wake_word")
 FOCUS_RESPONSE_TOPIC = "/aima/hal/audio/focus_response"
 PLAYBACK_TOPIC = "/aima/hal/audio/playback"
 REQUEST_FOCUS_SERVICE = "/aimdk_5Fmsgs/srv/RequestAudioFocus"
 ABANDON_FOCUS_SERVICE = "/aimdk_5Fmsgs/srv/AbandonAudioFocus"
 STOP_PLAY_SERVICE = "/aimdk_5Fmsgs/srv/StopAudioPlay"
-ALL_NAMES = (MIC_TOPIC, FOCUS_RESPONSE_TOPIC, PLAYBACK_TOPIC,
+ALL_NAMES = (MIC_TOPIC, RAW_MIC_TOPIC, FOCUS_RESPONSE_TOPIC, PLAYBACK_TOPIC,
              REQUEST_FOCUS_SERVICE, ABANDON_FOCUS_SERVICE, STOP_PLAY_SERVICE)
 
 # A topic or service name containing any of these is refused (case does not matter).
@@ -68,11 +78,40 @@ def assert_safe_name(name) -> None:
                                   "only and never touches movement or system topics." % (name, word))
 
 
+def downmix_to_mono(data, channels: int, mic_channels: int) -> bytes:
+    """Mix the raw capture to mono 16 kHz S16LE, the same way as the organisers' code:
+    take the first `mic_channels` channels of each frame and average them. The channels after
+    that are the speaker reference and are ignored. The average goes towards zero, like numpy's
+    astype. A broken tail (odd byte, half a frame) is dropped."""
+    channels = int(channels)
+    if channels < 1:
+        raise ValueError("channels must be 1 or more, got %r" % (channels,))
+    mics = min(max(int(mic_channels), 1), channels)      # out of range: first mic only / all channels
+    frame_bytes = 2 * channels
+    usable = len(data) - len(data) % frame_bytes
+    samples = array.array("h")
+    samples.frombytes(bytes(data[:usable]))
+    if sys.byteorder == "big":
+        samples.byteswap()
+    if mics == 1:
+        mono = samples[::channels]
+    else:
+        columns = [samples[i::channels] for i in range(mics)]
+        mono = array.array("h", [int(sum(frame) / mics) for frame in zip(*columns)])
+    if sys.byteorder == "big":
+        mono.byteswap()
+    return mono.tobytes()
+
+
 class RosAdapter(AudioSource, AudioSink):
     """Microphone and speaker of the robot, through ROS 2. One object is both source and sink."""
 
-    def __init__(self, mic_stream: int = 0, lead_s: float = 0.3, poll_s: float = 0.05):
-        self.mic_stream = mic_stream       # 0 = use whichever stream speaks first, 1 built-in, 2 external
+    def __init__(self, mic_stream: int = 0, lead_s: float = 0.3, poll_s: float = 0.05,
+                 mic_source: str = "raw"):
+        if mic_source not in MIC_SOURCES:
+            raise ValueError("mic_source must be one of %s, not %r" % (", ".join(MIC_SOURCES), mic_source))
+        self.mic_source = mic_source       # "raw" or "wake_word", see the top of this file
+        self.mic_stream = mic_stream       # wake_word only: 0 = first stream heard, 1 built-in, 2 external
         self.lead_s = lead_s               # seconds of audio queued ahead in the robot's buffer
         self.poll_s = poll_s
         self.pkg = "voo_bridge%d" % os.getpid()
@@ -82,6 +121,7 @@ class RosAdapter(AudioSource, AudioSink):
         self._closed = False
         self._mic_buf = bytearray()
         self._mic_lock = threading.Lock()
+        self._warned = set()
         self._next_tick: Optional[float] = None
         self._spk = bytearray()
         self._spk_lock = threading.Lock()
@@ -106,8 +146,18 @@ class RosAdapter(AudioSource, AudioSink):
                 "Cannot import ROS 2 or the AimDK messages (%s). On the robot's PC2 run "
                 "'source /opt/ros/humble/setup.bash' and 'source <path to aimdk>/install/setup.bash' "
                 "first (ask MangoBot for the path), then start the bridge again." % exc) from exc
+        audio_capture = None
+        if self.mic_source == "raw":
+            try:
+                from aimdk_msgs.msg import AudioCapture as audio_capture
+            except ImportError as exc:
+                raise RosNotAvailable(
+                    "The AimDK messages here have no AudioCapture type (%s), so the raw microphone "
+                    "%s cannot be used. Set the setting ros_mic_source to wake_word "
+                    "(BRIDGE_ROS_MIC_SOURCE=wake_word) to use %s instead."
+                    % (exc, RAW_MIC_TOPIC, MIC_TOPIC)) from exc
         self.ros = SimpleNamespace(
-            rclpy=rclpy, MultiThreadedExecutor=MultiThreadedExecutor, Node=Node,
+            rclpy=rclpy, MultiThreadedExecutor=MultiThreadedExecutor, Node=Node, AudioCapture=audio_capture,
             QoSProfile=QoSProfile, QoSHistoryPolicy=QoSHistoryPolicy,
             QoSReliabilityPolicy=QoSReliabilityPolicy, AudioData=AudioData, AudioInfo=AudioInfo,
             AudioPlayback=AudioPlayback, AudioVadStateType=AudioVadStateType,
@@ -128,7 +178,10 @@ class RosAdapter(AudioSource, AudioSink):
         self.node = ros.Node("voo_elevenlabs_bridge")
         mic_qos = ros.QoSProfile(history=ros.QoSHistoryPolicy.KEEP_LAST, depth=500,
                                  reliability=ros.QoSReliabilityPolicy.BEST_EFFORT)
-        self._subscribe(ros.ProcessedAudioOutput, MIC_TOPIC, self.on_mic, mic_qos)
+        if self.mic_source == "raw":
+            self._subscribe(ros.AudioCapture, RAW_MIC_TOPIC, self.on_raw_mic, mic_qos)
+        else:
+            self._subscribe(ros.ProcessedAudioOutput, MIC_TOPIC, self.on_mic, mic_qos)
         self._subscribe(ros.FocusResponse, FOCUS_RESPONSE_TOPIC, self.on_focus, 10)
         self.player = self._publisher(ros.AudioPlayback, PLAYBACK_TOPIC, 10)
         self.focus_cli = self._client(ros.RequestAudioFocus, REQUEST_FOCUS_SERVICE)
@@ -217,6 +270,30 @@ class RosAdapter(AudioSource, AudioSink):
             threading.Thread(target=self.take_focus, daemon=True).start()
 
     # ---------------------------------------------------------------------- microphone
+    def _warn_once(self, key, text, *args):
+        if key not in self._warned:
+            self._warned.add(key)
+            log.warning(text, *args)
+
+    def on_raw_mic(self, msg):
+        """mic_source "raw": one AudioCapture message. A bad message is dropped (and reported
+        once); an error here must never stop the ROS spin thread."""
+        try:
+            info = msg.info
+            rate = getattr(info, "sample_rate", None)
+            if rate not in (None, 0, RATE):
+                self._warn_once("rate", "the raw mic says %s Hz, not %d Hz: the voice will sound wrong",
+                                rate, RATE)
+            mono = downmix_to_mono(bytes(msg.data.data), info.channels, msg.mic_channels)
+        except Exception as exc:
+            self._warn_once(("bad", type(exc).__name__), "dropping a raw mic message that cannot be "
+                            "read (%s: %s); more of the same stay quiet", type(exc).__name__, exc)
+            return
+        if not mono:
+            return
+        with self._mic_lock:
+            self._mic_buf += mono
+
     def on_mic(self, msg):
         if self.mic_stream == 0:
             self.mic_stream = msg.stream_id
