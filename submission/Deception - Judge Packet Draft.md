@@ -4,7 +4,9 @@
 
 ## Project description (100 words, draft)
 
-At Dtec, visitors can ask for a destination in their own language. AI Voice Navigator clarifies the request and translates it into short English directions for a MangoBot operator, who controls the robot. The agent waits for an acknowledgment after each step, confirms the robot has stopped at the observed destination, then announces arrival in the visitor's language. If the destination changes, it checks the robot's position and facing before choosing a new path. Our demonstration plan covers a simple request, speech over background music, and a destination change. Every walking instruction requires evidence from a survey of the floor.
+Same text as `submission/JURY CUES.md`; keep the two identical.
+
+Robot A's operator doesn't know where visitors want to go or speak their language. Our ElevenLabs agent does. A visitor asks in Arabic, English or Hindi/Urdu; the agent clarifies vague requests, then talks the MangoBot operator there in short English steps, waiting for "done" after each one. Routes come only from places we checked on video and walked; anything else gets "not mapped yet" and a handover to a person. When a second person changes the destination, the agent stops, asks where the robot stands and replans. It announces arrival in the visitor's language. [ ] of 3 routes filmed.
 
 ## Jury time: 3 / 3 / 2
 
