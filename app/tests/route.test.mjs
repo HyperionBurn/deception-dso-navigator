@@ -50,11 +50,17 @@ test('plans one step and reroutes from the last confirmed or newly observed anch
   assert.deepEqual(original, {
     status: 'step', command: 'Walk straight and stop at the blue panel.',
     next_id: 'junction', expected_landmark: 'the blue panel',
+    exit_pose: facing, remaining_steps: 2,
+    destination_landmark: 'the fictional meeting sign',
   });
-  assert.deepEqual(planRoute(map, { destination_id: 'conference_room', current_id: 'start', ...north }), original);
+  assert.deepEqual(planRoute(map, { destination_id: 'conference_room', current_id: 'start', ...north }), {
+    ...original, destination_landmark: 'the fictional conference sign',
+  });
   assert.deepEqual(planRoute(map, { destination_id: 'conference_room', current_id: 'junction', ...facing }), {
     status: 'step', command: 'Turn right. Walk straight and stop at the fictional conference sign.',
     next_id: 'conference_room', expected_landmark: 'the fictional conference sign',
+    exit_pose: east, remaining_steps: 1,
+    destination_landmark: 'the fictional conference sign',
   });
   assert.equal(planRoute(map, { destination_id: 'conference_room', current_id: 'alternate' }).next_id, 'conference_room');
   assert.equal(planRoute(map, { destination_id: 'conference_room' }).status, 'needs_anchor');
@@ -63,7 +69,7 @@ test('plans one step and reroutes from the last confirmed or newly observed anch
 test('wrong or unknown observed orientation cannot authorize a pose-sensitive step', () => {
   for (const badPose of [{}, west]) {
     assert.deepEqual(planRoute(map, { destination_id: 'meeting_room', current_id: 'start', ...badPose }), {
-      status: 'needs_anchor', reason: 'current_orientation_required',
+      status: 'needs_anchor', reason: 'current_orientation_required', known_facings: ['north'],
     });
   }
   for (const badPose of [{}, east, { facing: 'the red panel' }]) {
@@ -78,7 +84,7 @@ test('raw observations resolve only by a unique exact normalized checked landmar
   assert.deepEqual(planRoute(map, input), planRoute(map, {
     destination_id: 'conference_room', current_id: 'junction', ...facing,
   }));
-  assert.equal(planRoute(map, { ...input, current_landmark: 'blue panel' }).status, 'needs_anchor');
+  assert.equal(planRoute(map, { ...input, current_landmark: 'blue panel' }).status, 'step');
   assert.equal(planRoute(map, { ...input, current_landmark: 'the bleu panel' }).status, 'needs_anchor');
   const duplicate = anchor('other_junction', 'The Blue Panel');
   assert.equal(planRoute({ ...map, anchors: [...anchors, duplicate] }, input).status, 'needs_anchor');
