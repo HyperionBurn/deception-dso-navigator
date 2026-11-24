@@ -1,0 +1,56 @@
+=== 3441: 36/45 frames registered, 3 model(s) ===
+  model 0: t=2.5..5.0 (3 frames)
+  model 1: t=10.0..19.5 (20 frames)
+  model 2: t=2.5..8.5 (13 frames)
+  no pose: 0-2s, 9-10s, 20-22s
+  heading changes >35deg (colmap vs optical-flow):
+  [ 10.0- 16.5] colmap LEFT 81deg | flow -61deg
+  [ 16.5- 19.5] colmap RIGHT 37deg | flow +76deg  <== DISAGREE
+  [  2.5-  4.0] colmap LEFT 37deg | flow -106deg  <== DISAGREE
+  [  4.0-  7.5] colmap RIGHT 46deg | flow -16deg  <== DISAGREE
+=== 3442: 85/161 frames registered, 4 model(s) ===
+  model 0: t=14.0..18.5 (10 frames)
+  model 1: t=39.5..45.0 (12 frames)
+  model 2: t=58.0..80.0 (45 frames)
+  model 3: t=22.5..31.0 (18 frames)
+  no pose: 0-14s, 19-22s, 32-39s, 46-58s
+  heading changes >35deg (colmap vs optical-flow):
+  [ 14.0- 16.5] colmap LEFT 93deg | flow -66deg
+  [ 72.5- 75.5] colmap RIGHT 44deg | flow +43deg
+  [ 76.0- 80.0] colmap LEFT 35deg | flow -38deg
+=== 3440: 302/473 frames registered, 9 model(s) ===
+  model 0: t=38.5..78.0 (54 frames)
+  model 1: t=140.5..186.5 (93 frames)
+  model 2: t=28.0..49.0 (30 frames)
+  model 3: t=0.0..10.0 (21 frames)
+  model 4: t=97.5..102.0 (10 frames)
+  model 5: t=102.5..114.0 (24 frames)
+  model 6: t=198.5..203.0 (10 frames)
+  model 7: t=121.0..140.0 (38 frames)
+  model 8: t=212.5..223.0 (22 frames)
+  no pose: 10-28s, 32-33s, 34-37s, 56-68s, 78-97s, 114-120s, 132-132s, 187-198s, 204-212s, 224-236s
+  heading changes >35deg (colmap vs optical-flow):
+  [ 38.5- 41.5] colmap LEFT 88deg | flow -233deg  <== DISAGREE
+  [ 41.5- 45.5] colmap RIGHT 88deg | flow -137deg  <== DISAGREE
+  [ 48.0- 50.5] colmap RIGHT 67deg | flow +45deg
+  [ 50.5- 53.5] colmap LEFT 66deg | flow -11deg  <== DISAGREE
+  [ 53.5- 69.0] colmap RIGHT 47deg | flow -446deg  <== DISAGREE
+  [ 71.0- 78.0] colmap RIGHT 87deg | flow +0deg  <== DISAGREE
+  [140.5-142.5] colmap LEFT 37deg | flow -91deg  <== DISAGREE
+  [142.5-146.0] colmap RIGHT 70deg | flow -29deg  <== DISAGREE
+  [146.0-149.0] colmap LEFT 51deg | flow -2deg  <== DISAGREE
+  [159.0-163.5] colmap RIGHT 81deg | flow +40deg  <== DISAGREE
+  [165.5-170.5] colmap RIGHT 49deg | flow -7deg  <== DISAGREE
+  [175.0-180.0] colmap LEFT 35deg | flow +0deg  <== DISAGREE
+  [ 33.5- 41.0] colmap LEFT 113deg | flow -76deg  <== DISAGREE
+  [ 41.0- 45.5] colmap RIGHT 68deg | flow -137deg  <== DISAGREE
+  [  0.0- 10.0] colmap RIGHT 114deg | flow +186deg  <== DISAGREE
+  [101.0-102.0] colmap RIGHT 49deg | flow +36deg
+  [102.5-104.5] colmap RIGHT 36deg | flow +60deg
+  [104.5-107.0] colmap LEFT 50deg | flow -51deg
+  [198.5-200.5] colmap LEFT 36deg | flow +0deg  <== DISAGREE
+  [121.0-130.0] colmap LEFT 175deg | flow -202deg
+  [130.5-133.0] colmap RIGHT 84deg | flow +103deg
+  [133.0-140.0] colmap LEFT 89deg | flow -24deg  <== DISAGREE
+  [212.5-216.0] colmap RIGHT 54deg | flow +119deg  <== DISAGREE
+  [218.5-223.0] colmap RIGHT 48deg | flow +8deg  <== DISAGREE

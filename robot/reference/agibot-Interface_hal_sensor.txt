@@ -1,0 +1,933 @@
+
+
+  
+
+  
+  5.4.1 Sensor Interfaces — AimDK_X2 1.1.0 documentation
+      
+      
+      
+      
+      
+      
+
+  
+    
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+    
+    
+    
+    
+     
+
+ 
+  
+    
+      
+        
+
+          
+          
+          
+            AimDK_X2
+          
+
+  
+    
+    
+    
+  
+
+        
+              
+1  About AgiBot X2
+1.1 Product Overview
+1.1.1 X2 Ultra Edition
+1.1.2 X2 EDU
+1.1.3 X2 Ultra(new version)
+
+1.2 Robot Specifications
+1.2.1 X2 Series Parameters
+
+1.3 On-board Computer
+1.3.1 Standard Computing Units
+1.3.2 Development Computing Unit Specifications
+
+1.4 User Debug Interfaces
+1.4.1 X2 Ultra
+1.4.2 X2 Ultra(new version)
+1.4.3 X2 EDU
+
+1.5 Secondary Development Interfaces
+1.6 AgiBot X2 Sensor Overview
+1.6.1 Sensor Capabilities & FOV Diagram
+1.6.2 Sensor Specifications
+LiDAR
+RGB-D Camera
+Front Stereo RGB Camera
+Front Interaction RGB Camera
+Rear RGB Camera
+Touch Sensor
+Standalone Inertial Sensor (IMU)
+GNSS Module
+
+1.7 Joint Motion Range Description (Warranted)
+1.7.1 Arm Motion Range
+1.7.2 Leg Motion Range
+1.7.3 Head Motion Range
+1.7.4 Waist Motion Range
+
+1.8 Coordinate System
+1.8.1 URDF and Factory Calibration
+1.8.2 Factory Calibration Extrinsics
+
+2  Operation Guide
+2.1 Startup Guide
+2.1.1 Startup While Suspended (Gantry Required) (Recommended for SDK use)
+2.1.2 Startup from Supine Position (No Gantry Required)
+2.1.3 Startup from Sitting Position (No Gantry Required)
+
+2.2 Robot Mobile App Connection (Agibot Go APP)
+2.2.1 Download Links
+iOS
+Android
+Operation Steps
+
+2.3 Remote Controller Connection
+2.3.1 Operation Steps
+
+2.4 Shutdown Guide
+2.4.1 Assist the Robot to Lie Down (No Gantry Required)
+Step 1: Enter Standing Preparation Mode (Position-Control Standing)
+Step 2: Lay the Robot Down
+Step 3: Enter Zero-Torque Mode
+Step 5: Pack the Robot as Illustrated
+
+2.4.2 Shutdown from Sitting Posture (No Gantry Required)
+Step 1: Use the Controller to Make the Robot Sit
+Step 2: Enter Zero-Torque Mode
+Step 3: Power Off
+Step 4: Pack the Robot as Shown
+
+3  Get the SDK
+4  Quick Start
+4.1 Read the user guide to familiarize yourself with relevant terminology and safety precautions.
+4.2 Choose a Development Mode
+4.2.1 Use SDK Directly on the Development Computing Unit (Quick Start; X2 Ultra and X2 Ultra(new version) Only)
+4.2.2 Container-Based Development on the Development Computing Unit (Recommended; X2 Ultra and X2 Ultra(new version) Only)
+4.2.3 Host PC / Computing Pack + Cross-Device Networking
+
+4.3 Network connection
+4.3.1 X2 Ultra / X2 Ultra(new version)
+4.3.2 X2 EDU
+
+4.4 Develop in a Container
+4.4.1 Prepare the Files
+Pre-Build Check: Mirror Reachability
+Pre-Build Check: Trailing Whitespace in /etc/subgid
+Dockerfile
+run.sh
+
+4.4.2 Build the Image
+4.4.3 Start the Container
+4.4.4 Enter the Container
+4.4.5 Build and Run
+
+4.5 Before Your First Run: Build the SDK
+4.6 Run an Example Program
+4.6.1 Get the Robot’s Current State
+4.6.2 Control the Robot to Wave
+
+4.7 Code Implementation
+4.7.1 Project Overview
+4.7.2 Add the Example to the Existing SDK Workspace
+Understand the Existing Structure
+Add a New Python Example
+
+4.7.3 Write the Control Code
+Create the Robot Control Class
+Add the Main Entry Point
+Register in the Build System
+
+4.7.4 Build and Run
+Build the Project
+Run the Project
+
+4.7.5 Code Walkthrough
+Robot Control Class
+
+4.7.6 Extensions and Optimization
+Add More Actions and Interactions
+Add Parameter Configuration
+Add Error Handling
+Add More Interaction Features
+
+4.7.7 Troubleshooting
+4.7.8 Next Steps
+4.7.9 Summary
+
+5  Interface Description
+5.1 Control Module
+5.1.1 Motion Mode Switching
+Core Functions
+Motion Mode Query Service
+Motion Mode Set Service
+Programming Examples
+Safety Notes
+
+5.1.2 Locomotion Control
+Control Functions
+Locomotion Control Topic
+Programming Examples
+Safety Notes
+
+5.1.3 MC Control Signal Configuration
+Key Features
+System-Provided Input Sources
+Arbitration Workflow
+Input Source Management Services
+Programming Examples
+Notes
+
+5.1.4 Motion Control Status Query
+Motion Control Status Topic
+Status Field Description
+
+5.1.5 Upper Body Control
+Topic Interface
+Joint Index
+Usage
+Programming Examples
+
+5.1.6 Preset Motion Control
+Preset Motion Control Service
+Preset Motion State Query Service
+Priority and Interruption Mechanism for Preset Motions
+Programming Examples
+Safety Notes
+
+5.1.7 LinkCraft Actions
+About LinkCraft
+Interface Description
+Programming Examples
+
+5.1.8 End Effector Control
+Control Methods
+Low-level Control Interface
+Hand Status Topics
+Hand Type Query Service
+Programming Examples
+Safety Notes
+
+5.1.9 Joint Control
+Key Features
+Joint Control Topics
+Joint State Query Service
+Programming Examples
+Safety Notes
+
+5.2 Interaction Module
+5.2.1 Voice Control
+Key Features
+Volume Control Services
+Text-to-Speech Service
+Audio File Playback Service
+Audio Stream Playback
+MIC Audio Stream Capture Topic
+Microphone Control Service
+Programming Examples
+Safety Notes
+
+5.2.2 Screen Control
+Key Features
+Emoji Playback Status Topic
+Emoji Playback Service
+Video Playback Service
+Programming Examples
+Safety Notes
+
+5.2.3 LED Strip Control
+Key Features
+LED Strip Control Service
+LED Strip State Topic
+Programming Examples
+
+5.2.4 LinkSoul Cloud Interaction
+About LinkSoul
+Technical Architecture
+Usage Steps
+
+5.3 Fault & System Management Module
+5.3.1 Fault Handling
+Core Features
+Topic Interfaces
+Service Interfaces
+Programming Examples
+
+5.3.2 Permission Management (Coming Soon)
+5.3.3 Diagnostic Code Reference
+How to Use This Table
+Alert Level Description
+Post-processing Signal (robot_sig)
+High-Risk Fault Overview
+PDU (Drive Control Unit)
+Health Management Module
+Hardware Abstraction Layer (ECAT, EtherCAT Joint Control)
+Perception Module
+Hardware Abstraction Layer (Sensors)
+SLAM Module
+Navigation Module
+Motion Control Module
+Interaction Module
+State Management Module
+Mapping Module
+Localization Module
+Hardware Abstraction Layer (Power)
+
+5.4 Hardware Abstraction Module
+5.4.1 Sensor Interfaces
+Core Features
+Standard Sensor Messages
+IMU Topics
+Head Touch Status Topic
+Rear RGB Camera Topics
+Stereo Camera Topics
+RGB-D Camera Topics
+LiDAR Topics
+GNSS Topic
+Code Examples
+Safety Notes
+
+5.4.2 Power Management Unit (PMU)
+Core Features
+Power Management Topic
+Safety Notes
+
+5.5 Perception Module (Optional)
+5.5.1 Vision (to be enabled)
+5.5.2 SLAM (Optional)
+Map Building
+Map Retrieval
+When to Relocalize
+Obtaining Map Identifiers and Coordinates
+Programming Examples
+
+5.5.3 Navigation (Optional)
+Navigation Task Topic
+Interface Specification
+Coordinate Conversion
+Programming Examples
+
+5.5.4 Data Visualization
+Foxglove Visualization
+RSView Visualization
+RViz Visualization
+System Status, Logs, and Communication Visualization
+
+5.6 System Modes and Developer Modes
+5.6.1 Check system status
+System State Topic
+Query System Mode Service
+
+5.6.2 Migrate to Develop mode
+5.6.3 Programming example
+5.6.4 Technical Details
+5.6.5 Safety precautions
+
+6  Example Code
+6.1 Python interface usage example
+6.1.1 Developer Mode
+6.1.2 Get Robot Mode
+6.1.3 Set Robot Mode
+6.1.4 Set Robot Motion
+6.1.5 Gripper Control
+6.1.6 Dexterous Hand Control
+6.1.7 Dexterous Hand Tactile Data (T2.1 Support)
+6.1.8 Register Secondary Development Input Source
+6.1.9 Get Current Input Source
+6.1.10 Robot Locomotion Control
+6.1.11 Joint Motor Control
+Robot Joint Control Example
+
+6.1.12 Keyboard Robot Control
+6.1.13 Take Photo
+6.1.14 Camera Streaming Example Collection
+Depth Camera Data Subscription
+Stereo Camera Data Subscription
+Rear Head Monocular Camera Data Subscription
+
+6.1.15 Head Touch Sensor Data Subscription
+6.1.16 LiDAR Data Subscription
+6.1.17 IMU Data Subscription
+6.1.18 Play Video
+6.1.19 Audio File Playback
+6.1.20 TTS (Text-to-Speech)
+6.1.21 Microphone Audio Reception
+6.1.22 Raw Microphone Audio Stream Receiver
+6.1.23 Get Current Microphone
+6.1.24 Switch Microphone
+6.1.25 Raw Audio Stream Playback
+6.1.26 Emoji Control
+6.1.27 Map Building
+6.1.28 Relocalization Using a Map
+6.1.29 Retrieve a Stored Map
+6.1.30 Navigation
+6.1.31 Play LinkCraft Action
+6.1.32 Play LinkCraft Action (Multi-Robot)
+6.1.33 LED Strip Control
+6.1.34 GNSS Positioning Data Subscription
+6.1.35 Upper Body Control
+6.1.36 Subscribe to HDS Diagnostics / Query Historical Events
+
+6.2 C++ Interface Usage Example
+6.2.1 Developer Mode
+6.2.2 Get Robot Mode
+6.2.3 Set Robot Mode
+6.2.4 Set Robot Motion
+6.2.5 Gripper Control
+6.2.6 Dexterous Hand Control
+6.2.7 Dexterous Hand Tactile Data (T2.1 Support)
+6.2.8 Register Secondary Development Input Source
+6.2.9 Get Current Input Source
+6.2.10 Robot Locomotion Control
+6.2.11 Joint Motor Control
+Robot Joint Control Example
+
+6.2.12 Keyboard Robot Control
+6.2.13 Take Photo
+6.2.14 Camera Streaming Example Collection
+Depth Camera Data Subscription
+Stereo Camera Data Subscription
+Rear Head Monocular Camera Data Subscription
+
+6.2.15 Head Touch Sensor Data Subscription
+6.2.16 LiDAR Data Subscription
+6.2.17 IMU Data Subscription
+6.2.18 Play Video
+6.2.19 Audio File Playback
+6.2.20 TTS (Text-to-Speech)
+6.2.21 Microphone Audio Reception
+6.2.22 Raw Microphone Audio Stream Receiver
+6.2.23 Get Current Microphone
+6.2.24 Switch Microphone
+6.2.25 Raw Audio Stream Playback
+6.2.26 Emoji Control
+6.2.27 Map Building
+6.2.28 Relocalization Using a Map
+6.2.29 Retrieve a Stored Map
+6.2.30 Navigation
+6.2.31 Play LinkCraft Action
+6.2.32 Play LinkCraft Action (Multi-Robot)
+6.2.33 LED Strip Control
+6.2.34 GNSS Positioning Data Subscription
+6.2.35 Upper Body Control
+6.2.36 Subscribe to HDS Diagnostics / Query Historical Events
+
+7  FAQ
+8  Temporary Transitional Solutions Statement
+8.1 Disable the Built-in Interaction System and Use Your Own Voice System
+8.1.1 Steps to Temporarily Disable the Built-in Interaction System
+8.1.2 Steps to Restore the Built-in Interaction System
+
+8.2 Motion State Simplification: Some McAction state codes prior to v0.7.x are no longer supported
+
+9  Boundaries & Disclaimer for Secondary Development
+
+ Simulation and Reinforcement Learning
+X2 RL Deployment
+1 Usage Instructions
+1.1 Prerequisites
+1.2 Quick Start
+1.3 Run the RL model example
+1.4 Directory Structure
+1.5 Model Deployment
+1.6 Communication Protocol
+
+X2 Sim + MC Deployment
+1 X2 MuJoCo Motion-Control Simulation
+1.1 Contents
+1.2 Software Components
+1.3 Prerequisites
+1.4 Prepare the Software Directory
+1.5 Option 1: Local Deployment
+1.6 Option 2: Docker Deployment
+1.7 Verify Motion Control
+1.8 Stop the Environment
+1.9 Troubleshooting
+
+ Changelog
+Changelog v1.1.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v1.0.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.9.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.2
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.1
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+Other Updates
+
+ AimDK Feedback
+
+        
+      
+    
+
+    
+          
+          AimDK_X2
+      
+
+      
+        
+          
+  
+      
+          5  Interface Description
+          5.4 Hardware Abstraction Module
+      5.4.1 Sensor Interfaces
+      
+      
+  
+  
+
+          
+           
+             
+  
+5.4.1 Sensor Interfaces
+The sensor interfaces provide data access and control for the robot’s various sensors, including cameras, IMUs, LiDAR, and touch sensors.
+
+Core Features
+
+Vision Sensors
+
+RGB Camera: Captures color images
+Depth Camera: Provides depth information
+Camera Intrinsics: Retrieves calibration parameters
+
+Pose Sensors
+
+IMU Data: Acceleration, angular velocity, and attitude angles
+Gyroscope: Measures angular velocity
+Accelerometer: Measures acceleration
+
+Environmental Perception Sensors
+
+LiDAR: Provides point cloud data
+Touch Sensors: Tactile feedback
+
+Standard Sensor Messages
+Most sensor interfaces use the standard message types defined in ROS sensor_msgs:
+
+Sensor Data Type
+Message Definition
+
+Camera intrinsics
+CameraInfo
+
+Raw image
+Image
+
+Compressed image
+CompressedImage
+
+IMU data
+Imu
+
+LiDAR point cloud
+PointCloud2
+
+GNSS positioning data
+NavSatFix
+
+IMU Topics
+Includes a chest IMU and a torso IMU, both on the Motion Control Computing Unit (PC1).
+You can also use the IMUs integrated in LiDAR, RGB-D camera, and stereo camera.
+
+Topic Name
+Data Type
+Description
+QoS
+Frequency
+
+/aima/hal/imu/chest/state
+Imu
+Chest IMU data
+BEST_EFFORT+TRANSIENT_LOCAL
+500Hz
+
+/aima/hal/imu/torso/state
+Imu
+Torso IMU data
+BEST_EFFORT+TRANSIENT_LOCAL
+500Hz
+
+/aima/hal/sensor/lidar_chest_front/imu
+Imu
+LiDAR IMU data
+RELIABLE+TRANSIENT_LOCAL
+200Hz
+
+/aima/hal/sensor/rgbd_head_front/imu
+Imu
+RGB-D camera IMU data
+RELIABLE+VOLATILE
+200Hz
+
+/aima/hal/sensor/stereo_head_front/imu
+Imu
+Stereo camera IMU data
+RELIABLE+TRANSIENT_LOCAL
+200Hz
+
+Note
+IMU field usage notes:
+
+frame_id: the header.frame_id of the chest and torso IMUs is fixed to base_link and identical for both; distinguish the data source by topic name.
+Covariance: the orientation_covariance, angular_velocity_covariance, linear_acceleration_covariance fields are not provided (all zeros); do not rely on covariance data.
+Timestamp: The header.stamp of the chest and torso IMUs is the robot receive time, not the sensor sample time; time-sensitive applications (e.g. sensor fusion) should account for serial transmission delay.
+Motion-control dependency: IMU data is a required input for the motion control system; loss of IMU data (serial failure or hal_imu process not running) will prevent the robot from moving.
+Extrinsics: the rotation matrix from the IMU to the robot base link is in Factory Calibration Parameters
+
+Head Touch Status Topic
+The touch sensor is located on the Interaction Computing Unit (PC3) and supports the following features:
+
+Access low-level touch events and raw samples
+Disable the built-in “head pat” skill (to be enabled)
+
+Topic Name
+Data Type
+Description
+QoS
+Frequency
+
+/aima/hal/sensor/touch_head
+TouchState
+Head touch status
+RELIABLE+TRANSIENT_LOCAL
+100Hz
+
+TouchState ros2-msg @ hal/msg/TouchState.msg
+# Head touch status
+# Topic: /aima/hal/sensor/touch_head
+
+MessageHeader header             # Message header
+uint8 event_type                 # Touch event (0-unknown, 1-idle, 2-touch)
+uint32[8] data                   # Raw sensor values for 8 channels (reserved)
+uint32[8] threshold              # Touch thresholds for 8 channels (reserved)
+bool[8] is_touched               # Touch state of 8 channels (reserved)
+
+Rear RGB Camera Topics
+The rear RGB camera is on the development compute unit (PC2) and can be used for visual localization assistance and semantic scene understanding.
+Raw image bandwidth is about 90 MB/s — use only on the same compute unit, do not subscribe across units.
+
+Topic Name
+Data Type
+Description
+QoS
+Frequency
+
+/aima/hal/sensor/rgb_head_rear/camera_info
+CameraInfo
+Camera intrinsics
+RELIABLE+TRANSIENT_LOCAL
+1Hz
+
+/aima/hal/sensor/rgb_head_rear/rgb_image
+Image
+Raw image
+RELIABLE+TRANSIENT_LOCAL
+10Hz
+
+/aima/hal/sensor/rgb_head_rear/rgb_image/compressed
+CompressedImage
+Compressed image
+RELIABLE+TRANSIENT_LOCAL
+10Hz
+
+Note
+Rear camera image resolution and encoding:
+
+X2 Ultra: 2064×1552, RGB8 encoding
+X2 Ultra(new version): 2048×1536, RGB8 encoding
+Compressed image: JPEG encoding (using Jetson hardware encoder)
+
+Installation orientation: The rear RGB camera on the X2 Ultra(new version) is rotated 90 degrees. If your application is affected, refer to Rear Head Monocular Camera Data Subscription to read the hardware version flag and automatically determine whether rotation compensation is needed.
+Field of view obstruction: The rear RGB camera’s field of view is partially obstructed by the handle behind the robot’s neck. If your algorithms are affected by this, refer to Rear Head Monocular Camera Data Subscription for mask preprocessing of images.
+
+Obstructed view of Rear RGB Camera on default head posture:
+
+Rear RGB Camera - Obstructed View Diagram
+
+Stereo Camera Topics
+The stereo camera is on the development compute unit (PC2) and can be used for stereo vision, teleoperation, obstacle perception, object recognition, VIO SLAM, VLA and more.
+Raw image bandwidth is about 90 MB/s per eye — use only on the same compute unit, do not subscribe across units.
+
+Topic Name
+Data Type
+Description
+QoS
+Frequency
+
+/aima/hal/sensor/stereo_head_front_left/camera_info
+CameraInfo
+Left camera intrinsics
+RELIABLE+TRANSIENT_LOCAL
+1Hz
+
+/aima/hal/sensor/stereo_head_front_left/rgb_image
+Image
+Left raw image
+RELIABLE+TRANSIENT_LOCAL
+10Hz
+
+/aima/hal/sensor/stereo_head_front_left/rgb_image/compressed
+CompressedImage
+Left compressed image
+RELIABLE+TRANSIENT_LOCAL
+10Hz
+
+/aima/hal/sensor/stereo_head_front_right/camera_info
+CameraInfo
+Right camera intrinsics
+RELIABLE+TRANSIENT_LOCAL
+1Hz
+
+/aima/hal/sensor/stereo_head_front_right/rgb_image
+Image
+Right raw image
+RELIABLE+TRANSIENT_LOCAL
+10Hz
+
+/aima/hal/sensor/stereo_head_front_right/rgb_image/compressed
+CompressedImage
+Right compressed image
+RELIABLE+TRANSIENT_LOCAL
+10Hz
+
+Note
+Stereo camera frame_id notes:
+
+Left: stereo_head_front (stereo reference frame; stereo extrinsics published via /tf_static use this frame as parent)
+Right: stereo_head_front_right
+
+The left camera’s frame_id is asymmetric with the _left suffix in the topic namespace. This is because the left camera serves as the stereo vision reference frame (containing the IMU and baseline extrinsics parent frame). Users should note this difference when performing tf integration or stereo epipolar geometry calculations.
+Stereo camera image resolution and encoding:
+
+X2 Ultra: 2064×1552, RGB8 encoding
+X2 Ultra(new version): 2048×1536, RGB8 encoding
+Compressed image: JPEG encoding (using Jetson hardware encoder)
+
+Camera resolution may vary across hardware/software versions. Users should always read the actual resolution from the width and height fields of the camera_info message and avoid hardcoding image dimensions.
+
+RGB-D Camera Topics
+The RGB-D camera is on the development compute unit (PC2) and can be used for object detection, spatial obstacle avoidance, and semantic environment understanding.
+Raw image bandwidth is about 80 MB/s per stream — use only on the same compute unit, do not subscribe across units.
+
+Topic Name
+Data Type
+Description
+QoS
+Frequency
+
+/aima/hal/sensor/rgbd_head_front/rgb_camera_info
+CameraInfo
+RGB intrinsics
+RELIABLE+VOLATILE
+30Hz
+
+/aima/hal/sensor/rgbd_head_front/rgb_image
+Image
+Raw image
+RELIABLE+VOLATILE
+30Hz
+
+/aima/hal/sensor/rgbd_head_front/rgb_image/compressed
+CompressedImage
+Compressed image
+RELIABLE+VOLATILE
+30Hz
+
+/aima/hal/sensor/rgbd_head_front/depth_camera_info
+CameraInfo
+Depth intrinsics
+RELIABLE+VOLATILE
+30Hz
+
+/aima/hal/sensor/rgbd_head_front/depth_image
+Image
+Depth image
+RELIABLE+VOLATILE
+30Hz
+
+/aima/hal/sensor/rgbd_head_front/imu
+Imu
+IMU data
+RELIABLE+VOLATILE
+200Hz
+
+Note
+Depth camera frame_id notes:
+
+Images and camera intrinsics: frame_id is rgbd_head_front
+Images and camera intrinsics: frame_id is rgbd_head_front
+IMU data: frame_id is camera_gyro_optical_frame (IMU’s own coordinate frame)
+
+RGB and depth images share the same frame_id (rgbd_head_front); distinguish them by topic name when subscribing. The image and IMU frame_id values differ — mind the coordinate frame when doing sensor fusion or TF transforms.
+Image resolution and encoding:
+
+RGB image: 1280×720, RGB8 encoding
+RGB compressed image: The camera directly outputs compressed images (MJPEG format)
+Depth image: 1280×720, 16UC1 encoding (uint16, pixel value is depth distance in millimeters)
+
+Depth-to-RGB alignment: depth and RGB pixels do not correspond one-to-one (hardware D2C alignment is disabled). The camera module publishes a static transform between the two via /tf_static, which users can use to register depth to RGB in the application layer:
+
+/tf_static transform: parent frame rgbd_head_front (color image), child frame rgbd_depth_head_front (depth image), i.e. the pose of the depth camera frame relative to the color camera frame
+
+Use the depth camera intrinsics in depth_camera_info to convert depth pixels to 3D points in the depth camera frame, then apply the /tf_static transform to convert them to the color camera frame, and finally project them onto the color image plane using the color camera intrinsics in rgb_camera_info. Camera intrinsics and base-to-camera extrinsics are available at Factory Calibration Parameters.
+Frame synchronization: RGB and depth frames are published independently and are not synchronized. If frame-level time alignment is needed (e.g., for SLAM or 3D reconstruction), timestamp matching must be performed at the application layer.
+
+LiDAR Topics
+Provides LiDAR point clouds and LiDAR-integrated IMU data for obstacle avoidance and SLAM/localization.
+The LiDAR is on the development compute unit (PC2) with data bandwidth on the order of 10 MB/s — cross-unit subscriptions are not recommended.
+
+Topic Name
+Data Type
+Description
+QoS
+Frequency
+
+/aima/hal/sensor/lidar_chest_front/lidar_pointcloud
+PointCloud2
+LiDAR point cloud
+RELIABLE+TRANSIENT_LOCAL
+10Hz
+
+/aima/hal/sensor/lidar_chest_front/imu
+Imu
+LiDAR IMU data
+RELIABLE+TRANSIENT_LOCAL
+200Hz
+
+Point cloud data notes:
+
+frame_id: lidar_chest_front (sensor native coordinate frame, no axis reordering)
+Point type: PointXYZIRT — includes x/y/z coordinates, intensity (reflection intensity), ring (beam index), timestamp (relative timestamp)
+Distance unit: meters (resolution 0.005m), blind zone 0.1m; maximum detection range depends on ambient lighting and target reflectivity (e.g., ~30m under 10% NIST 100klux sunlight conditions)
+
+LiDAR IMU notes:
+
+frame_id: lidar_imu_chest_front (different from the point cloud’s lidar_chest_front)
+When the module first receives a device information packet, it automatically publishes the IMU→LiDAR static transform to /tf_static
+Users performing sensor fusion should use this frame_id and the tf_static transform
+
+GNSS Topic
+The GNSS module provides positioning data for outdoor localization, navigation, and similar scenarios.
+
+Topic Name
+Data Type
+Description
+QoS
+Frequency
+
+/aima/hal/sensor/gnss
+NavSatFix
+GNSS positioning data (latitude, longitude, altitude)
+RELIABLE+TRANSIENT_LOCAL
+1Hz
+
+Note
+NavSatFix key field notes:
+
+status.status (fix status):
+
+0 (STATUS_FIX): Valid fix
+1 (STATUS_SBAS_FIX): Augmented fix (SBAS, Satellite-Based Augmentation System)
+-1 (STATUS_NO_FIX): No fix
+Usage tip: status >= 0 indicates a valid fix
+
+status.service (satellite system):
+
+Fixed to 1 (SERVICE_GPS, Global Positioning System) in current firmware
+Note: This field does not reflect the actual satellite system in use; for reference only
+
+position_covariance (position accuracy):
+
+3×3 covariance matrix [m²]; diagonal elements represent uncertainty in East, North, and Up directions
+Value interpretation: Lower values indicate higher accuracy; typical values of 1-10 m² indicate good accuracy
+Estimated based on satellite geometry (HDOP, Horizontal Dilution of Precision)
+
+covariance_type (accuracy type):
+
+1 (COVARIANCE_TYPE_APPROXIMATED): Estimated from satellite geometry (used by current firmware)
+0 (COVARIANCE_TYPE_UNKNOWN): No accuracy information
+
+Code Examples
+For detailed code samples and explanations, see:
+
+IMU Data Subscription: IMU Data Subscription IMU Data Subscription
+LiDAR Data Subscription: LiDAR Data Subscription LiDAR Data Subscription
+GNSS Data Subscription: GNSS Positioning Data Subscription GNSS Positioning Data Subscription
+Head Touch Sensor: Head Touch Sensor Data Subscription Head Touch Sensor Data Subscription
+Camera Data Subscription (depth/stereo/rear): Camera Streaming Example Collection Camera Streaming Example Collection
+Take Photo: Take Photo Take Photo
+
+Safety Notes
+
+Attention
+
+For high-bandwidth raw camera streams, do not subscribe across compute units; this may destabilize the system and create safety risks.
+
+           
+          
+          
+         Previous
+        Next 
+    
+
+  
+
+  
+    © Copyright 2025 Shanghai AgiBot Innovation Technology Co.,Ltd. All Rights Reserved.
+  
+
+  
+	沪ICP备2023019007号-2沪公网安备31011502401815号
+
+        
+      
+    
+  
+   
+

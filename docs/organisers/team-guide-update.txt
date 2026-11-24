@@ -1,0 +1,274 @@
+                                                                                       VOICE OF THE OASIS � TEAM GUIDE UPDATE
+
+WHAT CHANGED
+
+   Three things changed since the first guide. Everything else in it still stands: the rules every
+   agent must follow, the ElevenLabs toolkit, the robot rules, the judging criteria and the
+   prizes.
+
+01  AI Voice Navigator has a new brief
+
+    The robot walks, but only with a MangoBot operator at the controls. Your agent now guides that
+    operator: it understands the visitor, works out the route and tells the operator where to go. Pages 2 and
+    3.
+
+02Every demo is now 3 minutes
+
+            Each team gets 8 minutes: 3 minutes pitch, 3 minutes demo, 2 minutes questions. Robot videos can be
+
+            up to 3 minutes. Page 6.
+
+03Teams are being reshuffled
+
+            Some teams changed since the start. The final team list, robot slots and pitch order come in the next
+
+            update.
+
+UNCHANGED                                                 BY EMAIL
+
+   Soft Landing Guide and HALA Concierge keep                The MangoBot SDK and your new ElevenLabs
+   their briefs. They are on pages 4 and 5 so you            codes come in the email this guide is attached to.
+   have all three challenges in one place.
+
+QUESTIONS
+Find Adam or Seruga in the room, or ask at registration.
+
+UPDATE � 24 NOV 2026 � DTEC, DUBAI SILICON OASIS          1 / 6
+                                                          VOICE OF THE OASIS � TEAM GUIDE UPDATE
+
+01 AI VOICE NAVIGATOR
+
+HUMANOID ROBOT A            BLIND NAVIGATION              NEW BRIEF
+
+   The robot can walk, but not on its own: a MangoBot operator walks it. The operator does
+   not know where the visitor wants to go and does not speak the visitor's language. Your
+   agent is the only one who knows the way.
+
+HOW IT WORKS
+
+1                           2                             3                          4
+
+The visitor asks            Your agent plans              It talks the operator      It confirms
+                                                          there
+In their own language,      It understands the                                       It calls the stop and tells
+for a place on this floor.  request, asks if it is        Step by step, in English.  the visitor, in their
+                            unclear and works out         The operator follows       language, that they have
+                            the route.                    exactly what it says.      arrived.
+
+A WINNING DEMO                                            MUST HAVE
+                                                               At least two languages in every route, three is
+   A visitor asks in Arabic for a quiet place to take a        better, ideally with Arabic
+   call. The agent checks that a call booth will do,           Translation between the visitor and the operator
+   then tells the operator in English to turn left, walk       Directions the operator can follow step by step
+   past the kitchen and stop at the second booth.              A clarifying question when the request is vague
+   Halfway there, someone else asks for the                    A clear stop, and the arrival confirmed to the
+   conference room. The agent plans a new route                visitor
+   from where the robot stands and tells both people           A new route when the destination changes
+   what is happening.
+                                                          STRETCH
+THE COURSE                                                     Knowing where the robot is without asking
+Everything happens on this floor of Dtec:                      anyone
+                                                               LiDAR or the camera confirms the arrival
+  Meeting room Conference room                                 A visitor who switches language mid-route
+
+  Four call booths Team tables
+
+  Kitchen with tables and food
+
+HOW NAVIGATION WORKS                                                 OUT OF SCOPE
+
+We put up no markers. Your agent works out the route itself. It may  Moving the robot from your code:
+use the robot's LiDAR and camera, your own markers and other         MangoBot controls all movement.
+visual clues, and it may ask people nearby. The operator does        Leaving this floor.
+exactly what the agent says, even when it is wrong, and never picks
+the way himself.
+
+UPDATE � 24 NOV 2026 � DTEC, DUBAI SILICON OASIS                                                       2 / 6
+                                                                                       VOICE OF THE OASIS � TEAM GUIDE UPDATE
+
+01 YOUR THREE ROUTES
+
+   You film three routes on the robot, with the MangoBot operator walking it. At least two
+   languages in every route, ideally with Arabic, and the agent translates for the operator.
+
+1 The easy route                                          YOU CHOOSE
+
+   Pick the request and the destination. Show the whole flow working once: request, route, stop,
+
+   confirmation.
+
+2  Background music                                       WE SUPPLY THE MUSIC
+
+   We play a regular music track while the visitor talks. You cannot choose or change it. Your
+   agent still has to understand the visitor and get the robot there.
+
+3  Change of destination                                  WE SET THE CHANGE
+
+   Halfway along the route, a second person asks the robot to go somewhere else. We tell you the
+   new destination when you record, so it cannot be built in beforehand.
+
+THE VIDEO                                                 KNOWING WHERE THE ROBOT IS
+     Up to 3 minutes for all three routes                 This is the hard part, and any method is allowed.
+                                                          Some ways in:
+     Cuts are allowed between routes
+                                                             Count from the start. The agent knows where it
+     Each route is one take, with no cuts inside it          started and keeps track of every step it gave.
+
+     Keep the visitor, the robot and the operator in the     Ask. The agent asks the visitor or people nearby
+     shot                                                    what they can see.
+
+WHEN YOU RECORD                                              Sense. The robot's LiDAR and camera pick up
+In your robot slot. Slot times come with the new team        signs, your own markers and other visual clues.
+list. Find an organiser before you start: we bring the
+music and the new destination.
+
+TEST WITHOUT THE ROBOT
+
+You only get the robot in your slots. Until then, a teammate plays the operator: they walk the floor and follow your
+agent's directions word for word, even when they are wrong.
+
+UPDATE � 24 NOV 2026 � DTEC, DUBAI SILICON OASIS                                                3 / 6
+                                                                VOICE OF THE OASIS � TEAM GUIDE UPDATE
+
+02 SOFT LANDING GUIDE
+
+SOFTWARE ONLY  WEB OR PHONE  UNCHANGED
+
+A founder abroad wants to open a company in Dubai Silicon Oasis. The facts exist, but they
+are spread across DSO pages, Dtec pages, agency blogs and the press, and some of them
+contradict each other.
+
+WHO YOU BUILD FOR                                               MUST HAVE
+                                                                     Questions before advice: sector, team size, visas,
+A founder or a team of two or three outside the UAE,                 budget
+comparing DSO with other free zones, usually in a short              A plain explanation of the setup route that fits
+call.                                                                A checklist built for this founder
+                                                                     A booked call with a human adviser
+A WINNING DEMO
+                                                                STRETCH
+   A two-person SaaS team calls from Lagos and                       A written summary sent after the call
+   wants two visas. The agent asks what they do and                  Two setup options compared side by side
+   where they are, suggests an FZCO with a Dtec flexi                The founder's own language beyond English and
+   desk, says which figures a person must confirm,                   Arabic
+   reads back a document checklist and books a call
+   with the Dtec team.
+
+FACTS YOU CAN BUILD ON                                                             DSO
+                                                                                   DSO
+New companies register as an FZCO; existing ones open a                            DSO
+Branch. DSO's setup page also lists FZE and the Business           DSO AGENCY
+Operation Permit.                                                                  DSO
+                                                                             AGENCY
+Steps: DSOA portal application, fees and documents, e-                             DSO
+lease and bank share capital letter, pre-approval with
+activity and security checks, digital lease, e-licence.
+
+Documents: letter of intent, passports, NOC for UAE
+residents, bank statement or reference letter, application
+form, business plan, UBO declaration.
+
+Time: DSO states 7 days for the application and 2 days
+from complete documents to licence. Agencies quote 2 to
+4 weeks.
+
+Visas: up to 2 with a flexi desk, up to 3 with a fixed desk, 2
+per desk in a furnished office of 12 to 50 m�.
+
+Agency quotes per year: flexi desk about AED 18,000 (36
+hours a month), fixed desk about AED 24,000, furnished
+office from AED 47,820.
+
+Human handover: DSO on 600 59 55 57, Monday to Friday
+08:00 to 15:00.
+
+WHERE THE PUBLIC DATA STOPS                                        OUT OF SCOPE
+
+Minimum capital: DSO's setup page says AED 100,000, but the        Legal or tax advice presented as final.
+2023 DIEZ regulations reportedly set AED 1. Sources also disagree  The agent says a human adviser
+on whether setup can be done remotely. The agent should say so     confirms the details.
+and hand over to a person.
+                                                              VOICE OF THE OASIS � TEAM GUIDE UPDATE
+
+03 HALA CONCIERGE
+
+HUMANOID ROBOT B  UNCHANGED
+
+DSO already runs over 340 services online and a text chatbot. What it does not have is a
+voice a resident or a company can simply talk to, in Arabic or English, that knows which
+service applies and books the next step.
+
+WHO YOU BUILD FOR                                             MUST HAVE
+                                                                   At least five services handled end to end
+HR and PRO staff at DSO companies, and residents, at               The details a booking needs: name, date, contact
+the HALA reception or on the phone.                                A spoken confirmation
+                                                                   A clean handover to a person when out of scope
+A WINNING DEMO
+                                                              STRETCH
+   An HR manager asks in Arabic to renew an                        Rescheduling and cancelling
+   employee's visa, then switches to English to ask                A follow-up message
+   about an access card. The agent identifies both                 Calm handling of an impatient caller
+   services, lists the documents, books a slot in the              The same agent on a phone line
+   mock calendar, confirms by voice, and hands over
+   to a person when the caller disputes a fee.
+
+FACTS YOU CAN BUILD ON                                                    DSO PRESS
+                                                                                         DSO
+Hala is DSO's initiative that turned its Customer Happiness
+Center into a reception suite guiding members to digital                            PRESS
+services. Launched in 2018.                                                         PRESS
+                                                                    DSO RESEARCH
+DSO's portal offers over 340 digital services, with e-wallet                  RESEARCH
+payments and service kiosks.
+
+A 24-hour e-wallet deposit machine stands in the DSO HQ
+building.
+
+HADI, DSO's AI text chatbot, covered 226 smart services
+by 2020, when DSOA reported 95% of its services
+digitised.
+
+Contact: 600 59 55 57, Monday to Friday 08:00 to 15:00.
+Email hello@dso.ae; some DSO pages show
+business@dso.com.
+
+Services to model: employment visa (new, renewal,
+cancellation), establishment card, licence renewal and
+amendment, NOCs, access and ID cards, leasing,
+maintenance requests, complaints.
+
+WHERE THE PUBLIC DATA STOPS                                         OUT OF SCOPE
+
+The service catalogue, fees and processing times sit behind DSO's   Real DSO accounts, payments and
+member login. Build a demo catalogue with the services above,       personal data of real residents. Robot
+mark every fee and time as a demo value, and say so in your pitch.  movement, which MangoBot controls.
+
+UPDATE � 24 NOV 2026 � DTEC, DUBAI SILICON OASIS                    5 / 6
+                                                                                       VOICE OF THE OASIS � TEAM GUIDE UPDATE
+
+PITCH AND SUBMIT
+
+   Fewer teams means more time each. Every team now gets 8 minutes in front of the jury.
+
+3 MIN  3 MIN                                              2 MIN
+
+PITCH  DEMO                                               QUESTIONS
+
+THE DEMO                                                  SUBMIT
+                                                          The same form as before: project link, 100 words,
+Live on your phone or laptop, or play your video. Robot   demo video and up to 3 slides. Late submissions are
+teams play their robot video.                             not judged.
+ROBOT VIDEOS                                              A PITCH THAT WORKS
+
+     AI Voice Navigator: your three routes, up to 3            The problem and who has it
+     minutes, cuts only between routes (page 3)                The demo
+                                                               Why it matters for DSO
+     HALA Concierge: one take on the robot, with no            What comes next
+     cuts, up to 3 minutes
+
+STILL THE SAME                                            COMING NEXT
+
+The six judging criteria and their weights, the jury and  The final team list, robot slots, the submission
+the ElevenLabs prizes are as in the first guide, page 9.  deadline and the pitch order.
+
+UPDATE � 24 NOV 2026 � DTEC, DUBAI SILICON OASIS                                                            6 / 6
+
