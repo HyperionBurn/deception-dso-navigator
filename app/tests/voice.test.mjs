@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { VoiceSession } from '../static/voice.mjs';
+import { VoiceSession, agentDisplay, reconnectContext, reconnectDelay } from '../static/voice.mjs';
 
 const worklet = readFileSync(new URL('../static/pcm-worklet.js', import.meta.url), 'utf8');
 const signed = 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=fixture&token=fixture';
@@ -358,21 +358,156 @@ for (const [reason, finish] of [
   });
 }
 
-test('an error with close code 1000 still stops playback immediately', async t => {
-  const calls = browser(t, { urls: [signed, signed, signed] });
+test('a pre-negotiation close still ends in error', async t => {
+  const calls = browser(t);
   const states = [];
   const session = new VoiceSession({ onState: state => states.push(state) });
   t.after(() => session.stop());
-  for (const fail of [
-    socket => socket.remoteClose(1000, false),
-    socket => { socket.onerror(); socket.remoteClose(); },
-    socket => { socket.receive({ type: 'client_error' }); socket.remoteClose(); },
-  ]) {
-    const socket = await connect(session, calls);
-    socket.receive(audio(1));
-    fail(socket);
-    assert.equal(states.at(-1).phase, 'error');
-    assert.equal(calls.sources.at(-1).stopped, true);
-    assert.equal(calls.contexts.at(-1).state, 'closed');
+  const started = session.start('test-only');
+  await tick();
+  const [socket] = calls.sockets;
+  socket.open();
+  socket.remoteClose(1006, false);
+  assert.equal(states.at(-1).phase, 'error');
+  assert.equal(await started, false);
+});
+
+test('a socket error alone does not end the session; client_error still does', async t => {
+  const calls = browser(t, { urls: [signed, signed] });
+  const states = [];
+  const session = new VoiceSession({ onState: state => states.push(state) });
+  t.after(() => session.stop());
+  const socket = await connect(session, calls);
+  socket.onerror();
+  assert.equal(states.at(-1).phase, 'listening');
+  socket.receive({ type: 'client_error' });
+  assert.equal(states.at(-1).phase, 'error');
+});
+
+test('reconnectDelay backs off 1/2/4/8 s then gives up', () => {
+  assert.deepEqual([0, 1, 2, 3].map(reconnectDelay), [1000, 2000, 4000, 8000]);
+  assert.equal(reconnectDelay(4), null);
+  assert.equal(reconnectDelay(-1), null);
+});
+
+test('reconnectContext keeps the last transcript lines with operator guidance', () => {
+  const text = reconnectContext([
+    { role: 'user', text: 'كبينة مكالمات' },
+    { role: 'agent', text: 'Operator, move to marker B' },
+    { role: 'divider', text: 'ignored' },
+    { role: 'tool', text: 'ignored' },
+  ]);
+  assert.match(text, /VISITOR\/OP: كبينة مكالمات/);
+  assert.match(text, /AGENT: Operator, move to marker B/);
+  assert.match(text, /confirm the robot's position/i);
+  assert.ok(!text.includes('ignored'));
+});
+
+test('agentDisplay strips audio tags and detects operator lines', () => {
+  assert.deepEqual(agentDisplay('[happy] مرحبًا [warm]'), { text: 'مرحبًا', operator: false });
+  assert.deepEqual(agentDisplay('Operator, stop and hold.'), { text: 'Operator, stop and hold.', operator: true });
+  assert.deepEqual(agentDisplay('[pause] Operator, move to B.'), { text: 'Operator, move to B.', operator: true });
+  assert.equal(agentDisplay('[happy] '), null);
+  assert.equal(agentDisplay(''), null);
+  assert.equal(agentDisplay(undefined), null);
+});
+
+async function reconnectOnce(t, calls, session, states) {
+  const socket = calls.sockets.at(-1);
+  socket.remoteClose(1006, false);
+  assert.equal(states.at(-1).phase, 'reconnecting');
+  t.mock.timers.tick(1000);
+  await tick();
+  const retry = calls.sockets.at(-1);
+  assert.notEqual(retry, socket);
+  retry.open();
+  retry.receive(metadata());
+  return retry;
+}
+
+test('an unexpected drop reconnects, restores context, and keeps transcript memory', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const calls = browser(t, { urls: [signed, signed] });
+  const states = [];
+  const transcripts = [];
+  const session = new VoiceSession({
+    onState: state => states.push(state), onTranscript: value => transcripts.push(value),
+  });
+  t.after(() => session.stop());
+  const socket = await connect(session, calls);
+  socket.receive({ type: 'user_transcript', user_transcription_event: { user_transcript: 'booth' } });
+  socket.receive({ type: 'agent_response', agent_response_event: { agent_response: 'turn left' } });
+  socket.receive(audio(1));
+
+  const retry = await reconnectOnce(t, calls, session, states);
+  const update = retry.sent.find(message => message.type === 'contextual_update');
+  assert.match(update.text, /network drop/);
+  assert.match(update.text, /VISITOR\/OP: booth/);
+  assert.match(update.text, /AGENT: turn left/);
+  assert.deepEqual(transcripts.map(({ role }) => role),
+    ['user', 'agent', 'divider', 'divider']);
+  assert.equal(transcripts[2].text, 'Connection lost — reconnecting…');
+  assert.equal(transcripts[3].text, 'Connection restored');
+  assert.equal(states.at(-1).phase, 'listening');
+  assert.equal(calls.sources[0].stopped, true);
+  assert.equal(calls.requests.length, 2);
+  assert.deepEqual(JSON.parse(calls.requests[1].options.body), { access_code: 'test-only' });
+});
+
+test('failed retries back off then end in a clear error', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const calls = browser(t, { urls: [signed, signed, signed, signed, signed] });
+  const states = [];
+  const session = new VoiceSession({ onState: state => states.push(state) });
+  t.after(() => session.stop());
+  const socket = await connect(session, calls);
+  socket.remoteClose(1006, false);
+  for (const delay of [1000, 2000, 4000, 8000]) {
+    t.mock.timers.tick(delay);
+    await tick();
+    calls.sockets.at(-1).open();
+    calls.sockets.at(-1).remoteClose(1006, false);
   }
+  t.mock.timers.tick(1);
+  assert.equal(states.at(-1).phase, 'error');
+  assert.match(states.at(-1).detail, /could not reconnect/i);
+  assert.equal(calls.requests.length, 5);
+  assert.equal(calls.tracks[0].stopped, true);
+  assert.equal(calls.contexts[0].state, 'closed');
+});
+
+test('stop during reconnect ends the session without further retries', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const calls = browser(t, { urls: [signed, signed] });
+  const states = [];
+  const session = new VoiceSession({ onState: state => states.push(state) });
+  const socket = await connect(session, calls);
+  socket.remoteClose(1006, false);
+  assert.equal(states.at(-1).phase, 'reconnecting');
+  session.stop();
+  assert.equal(states.at(-1).phase, 'idle');
+  t.mock.timers.tick(30000);
+  assert.equal(calls.sockets.length, 1);
+  assert.equal(calls.requests.length, 1);
+});
+
+test('route tool events surface in the transcript stream', async t => {
+  const calls = browser(t);
+  const transcripts = [];
+  const session = new VoiceSession({ onTranscript: value => transcripts.push(value) });
+  t.after(() => session.stop());
+  const socket = await connect(session, calls);
+  socket.receive({
+    type: 'agent_tool_request',
+    agent_tool_request: { tool_name: 'next_route_step', tool_call_id: 'c1' },
+  });
+  socket.receive({
+    type: 'agent_tool_response',
+    agent_tool_response: { tool_name: 'next_route_step', tool_call_id: 'c1', is_error: false,
+      result: 'step: Turn left and hold' },
+  });
+  assert.deepEqual(transcripts, [
+    { role: 'tool', text: 'next_route_step → checking route…' },
+    { role: 'tool', text: 'next_route_step → step · step: Turn left and hold' },
+  ]);
 });

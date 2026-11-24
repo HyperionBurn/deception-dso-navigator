@@ -6,6 +6,12 @@ const PLAYBACK_SECONDS = 12;
 const PERMISSION_TIMEOUT = 30000;
 const START_TIMEOUT = 15000;
 const DRAIN_TIMEOUT = 5000;
+const RECONNECT_TIMEOUT = 15000;
+const TRANSCRIPT_MEMORY = 12;
+const RECONNECT_DELAYS = [1000, 2000, 4000, 8000];
+
+// Displayed agent text drops ElevenLabs audio tags like [happy] or [pause].
+const AUDIO_TAG = /\[(?:happy|sad|angry|warm|calm|curious|excited|serious|emphatic|playful|mischievous|whispers?|whispering|sighs?|laughs?|pauses?|sings?|crying|snorts?|yawns?|exhales?|inhales?|clears\sthr\w+|dramatic\st\w+|shouts?|screams?|gasps?|applause|breath\w*|long\spause|short\spause)\]/gi;
 
 function signedSocketUrl(value) {
   if (typeof value !== 'string' || value.length > 8192 || /[\s#\p{Cc}]/u.test(value)) throw new Error();
@@ -27,6 +33,55 @@ function validId(value) {
   return Number.isSafeInteger(value) && value >= 0;
 }
 
+function micFailure(error) {
+  switch (error?.name) {
+    case 'NotAllowedError':
+    case 'PermissionDeniedError':
+      return 'Microphone access was denied — allow it for this site, then try again.';
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return 'No microphone was found on this device.';
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return 'The microphone is busy — close other apps using it and try again.';
+    case 'OverconstrainedError':
+      return 'The microphone does not support the required audio format.';
+    default:
+      return 'Could not access the microphone or audio output.';
+  }
+}
+
+function sessionFailure(response) {
+  if (response.status === 401 || response.status === 403) return 'Wrong access code — check it and try again.';
+  if (response.status === 503) return 'Live voice is not enabled on this deployment.';
+  if (response.status >= 500) return 'Voice service unavailable — try again shortly.';
+  return 'Could not start a voice session.';
+}
+
+export function reconnectDelay(attempt) {
+  return Number.isInteger(attempt) && attempt >= 0 && attempt < RECONNECT_DELAYS.length
+    ? RECONNECT_DELAYS[attempt] : null;
+}
+
+export function reconnectContext(lines, limit = TRANSCRIPT_MEMORY) {
+  const history = (Array.isArray(lines) ? lines : [])
+    .filter(line => line && typeof line.text === 'string' && line.text.trim() &&
+      (line.role === 'user' || line.role === 'agent'))
+    .slice(-limit)
+    .map(line => `${line.role === 'user' ? 'VISITOR/OP' : 'AGENT'}: ${line.text.trim()}`)
+    .join(' / ') || '(nothing yet)';
+  return 'Reconnected after a network drop. Conversation so far: ' + history +
+    ' Continue from where it stopped; ask the operator to confirm ' +
+    "the robot's position before any new step.";
+}
+
+export function agentDisplay(text) {
+  if (typeof text !== 'string') return null;
+  const cleaned = text.replace(AUDIO_TAG, ' ').replace(/\s{2,}/g, ' ').trim();
+  if (!cleaned) return null;
+  return { text: cleaned, operator: /^operator\b/i.test(cleaned) };
+}
+
 export class VoiceSession {
   #run;
   #callbacks;
@@ -42,11 +97,13 @@ export class VoiceSession {
     const run = {
       ready, settle, abort: new AbortController(), sources: new Set(),
       firstAudioId: 0, latestAudio: -1, nextTime: 0, negotiated: false, queued: false,
+      reconnecting: false, everNegotiated: false, attempt: 0, transcripts: [],
+      accessCode,
       state: { phase: 'starting', mic: false, connected: false, speaker: false },
     };
     this.#run = run;
     this.#state(run, 'starting', { detail: 'Allow microphone access if your browser asks.' });
-    if (this.#run === run) void this.#open(run, accessCode);
+    if (this.#run === run) void this.#open(run);
     return ready;
   }
 
@@ -65,11 +122,14 @@ export class VoiceSession {
     this.#emit('onState', { ...run.state });
   }
 
-  async #open(run, accessCode) {
+  async #open(run) {
     let failure = 'Could not access the microphone or audio output.';
     try {
       // Start both browser permission operations before the first await.
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error();
+      if (!navigator.mediaDevices?.getUserMedia) {
+        failure = 'This browser cannot capture microphone audio.';
+        throw new Error();
+      }
       const context = new AudioContext();
       run.context = context;
       run.timer = setTimeout(() => this.#end(run, 'error',
@@ -90,6 +150,9 @@ export class VoiceSession {
             }
           }
         } else stopTracks(stream);
+      }, error => {
+        failure = micFailure(error);
+        throw error;
       });
       const resumed = (async () => context.resume())();
       await Promise.all([captured, resumed]);
@@ -118,32 +181,64 @@ export class VoiceSession {
       run.capture.connect(context.destination);
 
       failure = 'Could not start a voice session.';
-      const response = await fetch('/api/session', {
+      await this.#openSocket(run);
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      this.#end(run, 'error', error?.failure ?? failure);
+    }
+  }
+
+  async #openSocket(run) {
+    let response;
+    try {
+      response = await fetch('/api/session', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_code: accessCode }), signal: run.abort.signal,
+        body: JSON.stringify({ access_code: run.accessCode }), signal: run.abort.signal,
         mode: 'same-origin', credentials: 'same-origin', redirect: 'error', cache: 'no-store',
       });
-      if (this.#run !== run) return;
-      if (response.status === 401 || response.status === 403) failure = 'The access code was rejected.';
-      if (!response.ok) throw new Error();
-      const result = await response.json();
-      if (this.#run !== run) return;
-      const socket = new WebSocket(signedSocketUrl(result.signed_url ?? result.signedUrl), 'convai');
-      run.socket = socket;
-      socket.onopen = () => {
-        if (!this.#send(run, { type: 'conversation_initiation_client_data' })) {
-          this.#end(run, 'error', 'Could not initialize the voice connection.');
-        }
-      };
-      socket.onmessage = ({ data }) => this.#message(run, data);
-      socket.onerror = () => this.#end(run, 'error', 'The voice connection failed.');
-      socket.onclose = ({ code, wasClean }) => {
-        if (code === 1000 && wasClean && run.negotiated) this.#drain(run);
-        else this.#end(run, 'error', 'The voice connection closed.');
-      };
-    } catch {
-      this.#end(run, 'error', failure);
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+      const wrapped = new Error();
+      wrapped.failure = 'No internet connection — check Wi-Fi and try again.';
+      throw wrapped;
     }
+    if (this.#run !== run) return;
+    if (!response.ok) {
+      const failure = new Error();
+      failure.failure = sessionFailure(response);
+      throw failure;
+    }
+    const result = await response.json();
+    if (this.#run !== run) return;
+    const socket = new WebSocket(signedSocketUrl(result.signed_url ?? result.signedUrl), 'convai');
+    this.#attachSocket(run, socket);
+  }
+
+  #attachSocket(run, socket) {
+    run.socket = socket;
+    socket.onopen = () => {
+      if (!this.#send(run, { type: 'conversation_initiation_client_data' })) {
+        this.#end(run, 'error', 'Could not initialize the voice connection.');
+      }
+    };
+    socket.onmessage = ({ data }) => this.#message(run, data);
+    // A socket error is always followed by a close; let onclose decide.
+    socket.onerror = () => {};
+    socket.onclose = ({ code, wasClean }) => {
+      if (this.#run !== run || run.socket !== socket) return;
+      socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
+      run.socket = undefined;
+      run.negotiated = false;
+      if (code === 1000 && wasClean && run.everNegotiated) {
+        this.#drain(run);
+      } else if (run.reconnecting) {
+        this.#attempt(run, run.attempt + 1);
+      } else if (run.everNegotiated) {
+        this.#drop(run);
+      } else {
+        this.#end(run, 'error', 'The voice connection failed.');
+      }
+    };
   }
 
   #send(run, message) {
@@ -182,7 +277,15 @@ export class VoiceSession {
         }
         if (run.negotiated) return;
         run.negotiated = true;
+        run.everNegotiated = true;
         clearTimeout(run.timer);
+        clearTimeout(run.reconnectTimer);
+        if (run.reconnecting) {
+          run.reconnecting = false;
+          run.attempt = 0;
+          this.#send(run, { type: 'contextual_update', text: reconnectContext(run.transcripts) });
+          this.#emit('onTranscript', { role: 'divider', text: 'Connection restored' });
+        }
         run.capture.port.postMessage('start');
         this.#state(run, 'listening', { connected: true, pcm: FORMAT, speaker: true });
         if (this.#run === run) run.settle(true);
@@ -222,6 +325,30 @@ export class VoiceSession {
       case 'agent_response':
         this.#transcript(run, 'agent', event.agent_response_event?.agent_response);
         return;
+      case 'agent_response_correction': {
+        const text = event.agent_response_correction_event?.corrected_agent_response;
+        if (run.transcripts.at(-1)?.role === 'agent') run.transcripts.pop();
+        this.#transcript(run, 'agent', text);
+        return;
+      }
+      case 'agent_tool_request': {
+        const tool = event.agent_tool_request ?? event.tool_request_event ?? {};
+        const name = tool.tool_name || tool.name || 'route';
+        this.#emit('onTranscript', { role: 'tool', text: `${name} → checking route…` });
+        return;
+      }
+      case 'agent_tool_response': {
+        const tool = event.agent_tool_response ?? event.tool_response_event ?? {};
+        const name = tool.tool_name || tool.name || 'route';
+        const result = typeof tool.result === 'string' ? tool.result
+          : typeof tool.response === 'string' ? tool.response : '';
+        const detail = result.replace(/\s+/g, ' ').trim().slice(0, 160);
+        this.#emit('onTranscript', {
+          role: 'tool',
+          text: `${name} → ${tool.is_error ? 'error' : 'step'}${detail ? ` · ${detail}` : ''}`,
+        });
+        return;
+      }
       case 'interruption': {
         if (!run.negotiated || run.queued) return;
         const id = event.interruption_event?.event_id;
@@ -234,13 +361,22 @@ export class VoiceSession {
       case 'audio':
         if (run.negotiated) this.#play(run, event.audio_event);
         return;
+      case 'vad_score':
+      case 'agent_chat_response_part':
+      case 'agent_typing':
+      case 'asr_initiation_metadata':
+        return;
       default:
+        // Dev-only discovery for unhandled protocol event types.
+        console.debug?.('voice event', event?.type);
         return;
     }
   }
 
   #transcript(run, role, text) {
     if (run.negotiated && !run.queued && typeof text === 'string' && text.trim()) {
+      run.transcripts.push({ role, text: text.trim() });
+      if (run.transcripts.length > TRANSCRIPT_MEMORY) run.transcripts.shift();
       this.#emit('onTranscript', { role, text });
     }
   }
@@ -275,13 +411,13 @@ export class VoiceSession {
         if (!run.sources.size && this.#run === run) {
           run.nextTime = 0;
           if (run.draining) this.#end(run, 'idle');
-          else if (!run.queued) this.#state(run, 'listening');
+          else if (!run.queued && !run.reconnecting) this.#state(run, 'listening');
         }
       };
       source.start(start);
       run.nextTime = start + duration;
       run.latestAudio = id;
-      if (!run.queued && run.state.phase !== 'speaking') this.#state(run, 'speaking');
+      if (!run.queued && !run.reconnecting && run.state.phase !== 'speaking') this.#state(run, 'speaking');
     } catch (error) {
       if (error?.name !== 'InvalidCharacterError') this.#end(run, 'error', 'Could not play agent audio.');
     }
@@ -296,6 +432,59 @@ export class VoiceSession {
     run.sources.clear();
     run.nextTime = 0;
   }
+
+  // --- reconnect ----------------------------------------------------------
+
+  #drop(run) {
+    if (this.#run !== run || run.reconnecting || run.draining) return;
+    run.reconnecting = true;
+    run.attempt = 0;
+    run.queued = false;
+    run.firstAudioId = 0;
+    run.latestAudio = -1;
+    this.#clearPlayback(run);
+    run.capture?.port.postMessage('start');
+    this.#emit('onTranscript', { role: 'divider', text: 'Connection lost — reconnecting…' });
+    this.#attempt(run, 0);
+  }
+
+  #attempt(run, index) {
+    if (this.#run !== run || !run.reconnecting) return;
+    run.attempt = index;
+    const delay = reconnectDelay(index);
+    if (delay === null) {
+      this.#end(run, 'error',
+        'Connection lost — could not reconnect. Select Start microphone to try again.');
+      return;
+    }
+    this.#state(run, 'reconnecting', {
+      connected: false,
+      detail: `Connection lost — reconnecting in ${delay / 1000} s (attempt ${index + 1} of ${RECONNECT_DELAYS.length}).`,
+    });
+    clearTimeout(run.reconnectTimer);
+    run.reconnectTimer = setTimeout(() => void this.#reconnect(run), delay);
+  }
+
+  async #reconnect(run) {
+    if (this.#run !== run || !run.reconnecting) return;
+    clearTimeout(run.reconnectTimer);
+    // A socket that never answers within the timeout counts as a failed attempt.
+    run.reconnectTimer = setTimeout(() => {
+      if (this.#run === run && run.reconnecting && !run.negotiated) {
+        try { run.socket?.close(); } catch { /* already closed */ }
+        this.#attempt(run, run.attempt + 1);
+      }
+    }, RECONNECT_TIMEOUT);
+    try {
+      await this.#openSocket(run);
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      clearTimeout(run.reconnectTimer);
+      this.#attempt(run, run.attempt + 1);
+    }
+  }
+
+  // --- shutdown -------------------------------------------------------------
 
   #drain(run) {
     if (this.#run !== run || run.draining) return;
@@ -334,6 +523,7 @@ export class VoiceSession {
     this.#run = undefined;
     run.settle(false);
     clearTimeout(run.timer);
+    clearTimeout(run.reconnectTimer);
     this.#releaseCapture(run);
     this.#clearPlayback(run);
     if (run.audioStateChanged) run.context.removeEventListener('statechange', run.audioStateChanged);
