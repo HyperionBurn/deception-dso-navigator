@@ -703,17 +703,27 @@ class RobotIO:
         return self._node.create_client(srv_type, guard_ros_name(name))
 
     def _call(self, client, request, tries=8, timeout=0.25, stamp_obj=None):
-        """call_async + result wait with retries; ROS cross-host services are
-        flaky per the vendor docs. `stamp_obj` (a std_msgs Header) gets a fresh
-        stamp before each attempt, like the vendor examples do."""
+        """call_async + result wait with retries, as in the organisers' bridge;
+        ROS cross-host services are flaky per the vendor docs. rclpy's
+        Future.result() takes no timeout, so wait on a done callback instead
+        (the executor thread completes the future). `stamp_obj` (a std_msgs
+        Header) gets a fresh stamp before each attempt, like the vendor
+        examples do."""
         for _ in range(tries):
+            if not client.wait_for_service(timeout_sec=timeout):
+                continue
             if stamp_obj is not None:
                 stamp_obj.stamp = self._node.get_clock().now().to_msg()
             future = client.call_async(request)
-            try:
-                return future.result(timeout=timeout)
-            except Exception:
-                continue
+            done = threading.Event()
+            future.add_done_callback(lambda _future: done.set())
+            if done.wait(timeout * 4):
+                try:
+                    response = future.result()
+                except Exception:
+                    response = None
+                if response is not None:
+                    return response
         return None
 
     def _requester(self):
@@ -833,10 +843,14 @@ class RobotIO:
         self._bridge.feed_mic(bytes(msg.audio_data))
 
     def _on_raw_audio(self, msg):
-        total = msg.info.channels or (msg.mic_channels + msg.ref_channels)
+        # The vendor mic example reads only mic_channels, ref_channels and
+        # data.data; `info` may be absent, so fall back to those.
+        info = getattr(msg, 'info', None)
+        total = (getattr(info, 'channels', 0) or
+                 (msg.mic_channels + msg.ref_channels))
         mono = deinterleave_mic(bytes(msg.data.data), total,
                                 msg.mic_channels, self._mic_channel)
-        rate = msg.info.sample_rate
+        rate = getattr(info, 'sample_rate', 0)
         if rate and rate != RATE:
             mono = resample_linear(mono, rate)
         if mono:
