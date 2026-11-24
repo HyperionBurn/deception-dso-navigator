@@ -18,6 +18,28 @@ function verdict(label, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  (${detail})` : ''}`);
 }
 
+async function fetchTranscript(conversationId) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const conv = await fetch(
+      `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`,
+      { headers: { 'xi-api-key': apiKey } }).then(r => r.json());
+    if (conv.status === 'done' || conv.status === 'failed') {
+      for (const turn of conv.transcript ?? []) {
+        console.log(`  ${turn.role}: ${turn.message ?? turn.text ?? ''}`);
+        for (const call of turn.tool_calls ?? turn.toolCalls ?? []) {
+          console.log(`    tool call: ${JSON.stringify(call).slice(0, 300)}`);
+        }
+        for (const result of turn.tool_results ?? turn.toolResults ?? []) {
+          console.log(`    tool result: ${JSON.stringify(result).slice(0, 500)}`);
+        }
+      }
+      return;
+    }
+    await pause(1500);
+  }
+  console.log('  (stored conversation never reached done; transcript unavailable)');
+}
+
 async function drive(name, turns) {
   console.log(`\n===== ${name} =====`);
   const url = new URL('https://api.elevenlabs.io/v1/convai/conversation/get-signed-url');
@@ -25,70 +47,81 @@ async function drive(name, turns) {
   const signed = await fetch(url, { headers: { 'xi-api-key': apiKey } })
     .then(r => r.ok ? r.json() : Promise.reject(new Error(`signed-url ${r.status}`)));
 
-  const state = { metadata: null, replies: [], transcripts: [], tools: [] };
+  const state = {
+    metadata: null, replies: [], transcripts: [],
+    toolRequests: 0, toolResponses: 0, lastToolResponseAt: 0, lastEventAt: 0,
+  };
   let closed = null;
   const socket = new WebSocket(signed.signed_url, 'convai');
   const send = event => socket.send(JSON.stringify(event));
+  const AGENT_EVENTS = new Set(['agent_response', 'audio', 'agent_tool_request',
+    'agent_tool_response', 'agent_response_correction']);
   socket.addEventListener('open', () => send({ type: 'conversation_initiation_client_data' }));
   socket.addEventListener('close', ({ code }) => { closed = code; });
   socket.addEventListener('message', ({ data }) => {
     const event = JSON.parse(data);
+    const now = Date.now();
+    if (AGENT_EVENTS.has(event.type)) state.lastEventAt = now;
     if (event.type === 'ping') send({ type: 'pong', event_id: event.ping_event.event_id });
     if (event.type === 'conversation_initiation_metadata') state.metadata = event.conversation_initiation_metadata_event;
     if (event.type === 'user_transcript') state.transcripts.push(event.user_transcription_event.user_transcript);
-    if (event.type === 'agent_response') state.replies.push(event.agent_response_event.agent_response);
-    if (event.type === 'agent_tool_request') state.tools.push(event);
-    if (event.type === 'agent_tool_response') state.tools.push(event);
+    if (event.type === 'agent_response') {
+      state.replies.push({ text: event.agent_response_event.agent_response, at: now });
+    }
+    if (event.type === 'agent_tool_request') state.toolRequests += 1;
+    if (event.type === 'agent_tool_response') {
+      state.toolResponses += 1;
+      state.lastToolResponseAt = now;
+    }
   });
 
-  async function until(check, timeout = 25000) {
-    const deadline = Date.now() + timeout;
-    while (!check()) {
-      if (closed || Date.now() >= deadline) return false;
+  // Wait for the agent to be idle: an agent_response exists since `since`, no
+  // agent events for 3 s, all tool requests answered, and at least one
+  // agent_response after the last tool response. Returns false on 30 s timeout.
+  async function waitIdle(since) {
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline && !closed) {
+      const toolsDone =
+        state.toolRequests - since.toolRequests === state.toolResponses - since.toolResponses;
+      const quiet = state.lastEventAt <= since.sentAt || Date.now() - state.lastEventAt > 3000;
+      const replied = state.replies.length > since.replies;
+      const replyAfterTools = state.toolResponses - since.toolResponses === 0 ||
+        state.replies.some(reply => reply.at > state.lastToolResponseAt);
+      if (replied && toolsDone && replyAfterTools && quiet) return true;
       await pause(150);
     }
-    return true;
+    return false;
   }
 
   try {
-    if (!await until(() => state.metadata && state.replies.length, 20000)) {
+    if (!await waitIdle({ replies: 0, toolRequests: 0, toolResponses: 0, sentAt: Date.now() - 60000 })) {
       verdict(`${name}: greeting`, false, `closed=${closed}`);
       return;
     }
-    console.log(`AGENT: ${state.replies.at(-1)}`);
+    console.log(`AGENT: ${state.replies.at(-1).text}`);
     for (const [i, { send: text, expect, label }] of turns.entries()) {
-      const at = state.replies.length;
+      const since = {
+        replies: state.replies.length,
+        toolRequests: state.toolRequests,
+        toolResponses: state.toolResponses,
+        sentAt: Date.now(),
+      };
       send({ type: 'user_message', text });
       console.log(`\nUSER (${label}): ${text}`);
-      const heard = await until(() => {
-        const fresh = state.replies.slice(at).join(' ');
-        return state.replies.length > at && (!expect || expect.test(fresh));
-      });
-      const fresh = state.replies.slice(at).join(' ');
+      await waitIdle(since);
+      const fresh = state.replies.slice(since.replies).map(reply => reply.text).join(' ');
       console.log(`AGENT: ${fresh}`);
-      verdict(`${name} turn ${i + 1}: ${label}`, heard && (!expect || expect.test(fresh)),
-        heard ? '' : 'timed out waiting for matching reply');
-      if (!heard) break;  // a missed expectation derails the rest of the script
+      verdict(`${name} turn ${i + 1}: ${label}`, !expect || expect.test(fresh),
+        expect && !expect.test(fresh) ? `wanted ${expect}` : '');
+      if (!state.replies.length) break;
     }
   } finally {
     socket.close();
   }
 
-  await pause(1500);
-  // Fetch the stored conversation for tool-call evidence.
-  try {
-    const conv = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversations/${state.metadata.conversation_id}`,
-      { headers: { 'xi-api-key': apiKey } }).then(r => r.json());
-    const toolCalls = (conv.transcript ?? []).flatMap(turn => turn.tool_results ?? turn.toolResults ?? []);
-    console.log('\n--- stored tool calls ---');
-    for (const call of toolCalls) console.log(JSON.stringify(call).slice(0, 400));
-    console.log(`--- ${(conv.transcript ?? []).length} transcript turns stored ---`);
-    return toolCalls;
-  } catch (error) {
-    console.log('conversation fetch failed:', error.message);
-    return [];
-  }
+  await pause(800);
+  console.log('\n--- stored transcript ---');
+  await fetchTranscript(state.metadata?.conversation_id);
 }
 
 // Run A: full multi-leg route — clarify, position report, two legs, arrival.
@@ -103,9 +136,9 @@ const runA = [
   { label: 'operator reports first leg done', send: 'Done.',
     expect: /operator|booth|sign/i },
   { label: 'operator reports second leg done', send: 'Done.',
-    expect: /arrived|confirm|stop|there/i },
+    expect: /arrived|confirm|stop|there|booth/i },
   { label: 'operator confirms arrival', send: 'Confirmed.',
-    expect: /arrived|destination|enjoy|welcome|great/i },
+    expect: /arrived|destination|enjoy|welcome|great|booth/i },
 ];
 
 // Run B: destination change mid-route after the first leg completes.

@@ -10,10 +10,22 @@
     "test": "node --test tests/*.test.mjs",
     "map:check": "node scripts/check-map.mjs",
     "map:ingest": "node scripts/ingest-survey.mjs",
+    "build": "esbuild src/talk.jsx --bundle --outfile=static/talk/talk.js --format=esm --jsx=automatic",
     "dev": "node --env-file=.env.local --run vercel:dev",
     "vercel:dev": "vercel dev --listen 127.0.0.1:8769"
   },
   "dependencies": {
-    "@elevenlabs/elevenlabs-js": "2.79.0"
+    "@elevenlabs/client": "^1.38.0",
+    "@elevenlabs/elevenlabs-js": "2.79.0",
+    "@elevenlabs/react": "^1.24.0",
+    "@workhub/voice-kit": "https://github.com/alinaqi/elevenlabs-voice-kit/releases/download/v0.1.1/workhub-voice-kit-0.1.1.tgz",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
