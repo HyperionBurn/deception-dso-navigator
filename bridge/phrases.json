@@ -1,0 +1,9 @@
+[
+  {"id": "heard", "lang": "en", "text": "I heard you.", "file": "heard_en.pcm", "reviewed": true},
+  {"id": "one_moment", "lang": "en", "text": "One moment, please.", "file": "one_moment_en.pcm", "reviewed": true},
+  {"id": "connection_slow", "lang": "en", "text": "The connection is slow. Please repeat that in a moment.", "file": "connection_slow_en.pcm", "reviewed": true},
+  {"id": "operator_stop", "lang": "en", "text": "Operator, stop. Stay where you are.", "file": "operator_stop_en.pcm", "reviewed": true},
+  {"id": "heard", "lang": "ar", "text": "سمعتك.", "file": "heard_ar.pcm", "reviewed": false},
+  {"id": "one_moment", "lang": "ar", "text": "لحظة من فضلك.", "file": "one_moment_ar.pcm", "reviewed": false},
+  {"id": "connection_slow", "lang": "ar", "text": "الاتصال بطيء. أعد كلامك بعد لحظة من فضلك.", "file": "connection_slow_ar.pcm", "reviewed": false}
+]
