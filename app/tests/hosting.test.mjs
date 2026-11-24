@@ -94,9 +94,9 @@ test('offline session never reaches signing', async t => {
 });
 
 test('a short access code is rejected even if it matches the configured value', async t => {
-  configure(t, { NAVIGATOR_ACCESS_CODE: 'short' });
+  configure(t, { NAVIGATOR_ACCESS_CODE: 'abc' });
   const upstream = t.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected signing call'); });
-  await expectError(await session.fetch(request({ body: '{"access_code":"short"}' })), 401);
+  await expectError(await session.fetch(request({ body: '{"access_code":"abc"}' })), 401);
   assert.equal(upstream.mock.callCount(), 0);
 });
 

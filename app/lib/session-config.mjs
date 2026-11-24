@@ -1,7 +1,7 @@
 const DEFAULT_AGENT_ID = 'agent_0101m86hthvjfm6vqeymg81may5e';
 
 export function validAccessCode(value) {
-  return typeof value === 'string' && value.length <= 256 && value.trim().length >= 12;
+  return typeof value === 'string' && value.length <= 256 && value.trim().length >= 4;
 }
 
 export function getConfig(env = process.env) {
