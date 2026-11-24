@@ -11,7 +11,7 @@ Read first: `START HERE.md`, `AI Voice Navigator - PRD.md`. Brief = 24 Nov Team 
 
 ## Facts
 - Agent `agent_0101m86hthvjfm6vqeymg81may5e`, LLM deepseek-v41-flash, TTS eleven_v4_turbo, ASR scribe_realtime, pcm_16000 both ways, tool `next_route_step` → `POST /api/route` (header `x-navigator-route-key`).
-- Team access code for live voice: `<access code>` (case/whitespace-insensitive). Secrets live only in Vercel env, `app/.env.local`, `app/.private/` (gitignored). Never print or commit them.
+- Team access code for live voice: ask Wasif (it is never written in the repo). Secrets live only in Vercel env, `app/.env.local`, `app/.private/` (gitignored). Never print or commit them.
 - Floor map holds only what `qa/survey.txt` supplies (today: team tables and kitchen, drafted from video, unwalked; see `qa/FLOOR FROM VIDEO.md`); extend it from the floor survey (`qa/FLOOR INTAKE.md`), anchors with `aliases` (EN+AR), map-level `survey` evidence, optional `start`. Matching is token-based (see `lib/route-contract.md`).
 - Robot audio bridge: `robot/bridge/` (ROS2 audio topics only — never motion). AgiBot docs cached in `.cache/x2-python.txt`.
 
