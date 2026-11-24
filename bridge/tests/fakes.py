@@ -210,7 +210,8 @@ def fast_config(**overrides):
 class Rig:
     """Fake server + fake mic + fake speaker + a running SessionCore."""
 
-    def __init__(self, phrases=None, server=None, sink=None, source=None, hooks=None, **config):
+    def __init__(self, phrases=None, server=None, sink=None, source=None, hooks=None,
+                 fail_urls=0, **config):
         self.server = server or FakeServer()
         self.source = source or FakeSource()
         self.sink = sink or FakeSink()
@@ -220,9 +221,14 @@ class Rig:
         self.core = None
         self.task = None
         self.urls_asked = 0
+        self.url_times = []
+        self.fail_urls = fail_urls    # the first N URL requests fail, like "no internet"
 
     async def _url(self):
         self.urls_asked += 1
+        self.url_times.append(time.monotonic())
+        if self.urls_asked <= self.fail_urls:
+            raise OSError("no internet")
         return self.server.url
 
     async def __aenter__(self):
@@ -249,7 +255,7 @@ class Rig:
         return await self.wait_connection(1, timeout)
 
 
-def write_phrases(directory, languages=("en",), only=None):
+def write_phrases(directory, languages=("en",), only=None, seconds=0.1):
     """Write phrases.json plus tiny PCM files. Markers: heard 1111, one_moment 2222,
     connection_slow 3333, operator_stop 4444 (Arabic copies add 100)."""
     import os
@@ -263,7 +269,7 @@ def write_phrases(directory, languages=("en",), only=None):
             marker += 100 if lang == "ar" else 0
             name = "%s_%s.pcm" % (pid, lang)
             with open(os.path.join(directory, name), "wb") as f:
-                f.write(tone(marker, 1600))   # 0.1 s
+                f.write(tone(marker, int(16000 * seconds)))
             items.append({"id": pid, "lang": lang, "text": pid + " " + lang,
                           "file": name, "reviewed": lang == "en"})
     with open(os.path.join(directory, "phrases.json"), "w") as f:
