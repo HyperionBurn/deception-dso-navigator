@@ -4,6 +4,8 @@ A bilingual voice navigator for the November 24 revised challenge. The visitor s
 
 The website includes three clearly labelled practice simulations and team-gated live voice using the same private ElevenLabs agent as the robot. The route service starts empty and cannot return real directions until someone on the floor verifies the dedicated map. Use the latest organizer confirmation for slots and deadlines.
 
+[Open the Deception website](https://deception-dso-navigator.vercel.app/). Practice requires no code. Ask the project owner for the team code before using live voice.
+
 - [Start here](START%20HERE.md) for the actual requirements and evidence gates.
 - [Course capture sheet](qa/physical-walk.md) for checked field data.
 - [Route tool contract](app/lib/route-contract.md) for planner inputs, outcomes, and how to add checked edges.

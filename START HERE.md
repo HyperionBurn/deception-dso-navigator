@@ -2,6 +2,8 @@
 
 **Use the November 24 Team Guide Update.** The original stationary lobby demo has been superseded. Only a MangoBot operator may move Robot A. The agent translates visitor intent into English, gives one verified instruction, waits for a physical observation, and confirms the stop and endpoint before telling the visitor they have arrived.
 
+**Deployment:** [Deception website](https://deception-dso-navigator.vercel.app/) · [private GitHub source](https://github.com/HyperionBurn/deception-dso-navigator). Live voice uses a team code; it is not included in Git. The project owner's local copy is `app/.private/team-access-code.txt`. The same private ElevenLabs agent is configured with the `next_route_step` webhook. Vercel build readiness and 24 local checks passed. Live browser audio and Robot A remain unverified.
+
 | Gate | What proves it |
 |---|---|
 | **Browser voice** | A visitor speaks Arabic or English, the agent clarifies the request, and an English operator instruction is clearly distinct. A reply about unknown routes gives no movement direction. |
