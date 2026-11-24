@@ -109,9 +109,10 @@ class RosAdapter(AudioSource, AudioSink):
     def __init__(self, mic_stream: int = 0, lead_s: float = 0.3, poll_s: float = 0.05,
                  mic_source: str = "raw"):
         if mic_source not in MIC_SOURCES:
-            raise ValueError("mic_source must be one of %s, not %r" % (", ".join(MIC_SOURCES), mic_source))
+            raise ValueError("mic_source must be one of %s, not %r"
+                             % (", ".join(MIC_SOURCES), mic_source))
         self.mic_source = mic_source       # "raw" or "wake_word", see the top of this file
-        self.mic_stream = mic_stream       # wake_word only: 0 = first stream heard, 1 built-in, 2 external
+        self.mic_stream = mic_stream       # wake_word only: 0 = first heard, 1 built-in, 2 external
         self.lead_s = lead_s               # seconds of audio queued ahead in the robot's buffer
         self.poll_s = poll_s
         self.pkg = "voo_bridge%d" % os.getpid()
@@ -157,8 +158,8 @@ class RosAdapter(AudioSource, AudioSink):
                     "(BRIDGE_ROS_MIC_SOURCE=wake_word) to use %s instead."
                     % (exc, RAW_MIC_TOPIC, MIC_TOPIC)) from exc
         self.ros = SimpleNamespace(
-            rclpy=rclpy, MultiThreadedExecutor=MultiThreadedExecutor, Node=Node, AudioCapture=audio_capture,
-            QoSProfile=QoSProfile, QoSHistoryPolicy=QoSHistoryPolicy,
+            rclpy=rclpy, MultiThreadedExecutor=MultiThreadedExecutor, Node=Node,
+            AudioCapture=audio_capture, QoSProfile=QoSProfile, QoSHistoryPolicy=QoSHistoryPolicy,
             QoSReliabilityPolicy=QoSReliabilityPolicy, AudioData=AudioData, AudioInfo=AudioInfo,
             AudioPlayback=AudioPlayback, AudioVadStateType=AudioVadStateType,
             CommonState=CommonState, FocusRequester=FocusRequester, FocusResponse=FocusResponse,

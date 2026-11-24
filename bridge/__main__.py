@@ -65,8 +65,9 @@ def _parse_like(default, text: str):
     """Turn an environment string into the same type as the default value."""
     if isinstance(default, bool):
         return text.strip().lower() in ("1", "true", "yes", "on")
+    # "none" means "off" for numbers, but for text settings it is a real value (mic_gate: none).
     if text.strip().lower() == "none" and not isinstance(default, str):
-        return None                       # "none" means "off" for numbers; for text it is a value (mic_gate)
+        return None
     if isinstance(default, int):
         return int(text)
     if isinstance(default, float):
