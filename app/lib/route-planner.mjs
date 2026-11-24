@@ -115,7 +115,13 @@ function canonicalFacing(map, anchors, observed) {
   }
   const match = matchPhrases(
     [...candidates].map(([key, phrases]) => ({ key, phrases })), observed);
-  return match?.winner?.key ?? null;
+  if (match.winner) return match.winner.key;
+  // A label spoken verbatim beats a landmark that only contains its words.
+  const exact = (match.tied ?? []).filter(candidate => {
+    const keyTokens = tokenize(candidate.key);
+    return keyTokens.size === observed.size && isSubset(keyTokens, observed);
+  });
+  return exact.length === 1 ? exact[0].key : null;
 }
 
 function checkedAnchors(records, survey) {
@@ -183,10 +189,16 @@ function knownLandmarks(map, anchors) {
 // Shared plan for both exports: resolves the request to a checked current
 // anchor and pose, then returns the full shortest checked route.
 function fullPlan(map, { destination_id, current_id, current_landmark, heading, facing }) {
-  if (!COURSE_DESTINATIONS.includes(destination_id)) {
-    return { status: 'unverified', reason: 'unknown_destination' };
-  }
   const anchors = checkedAnchors(map.anchors, map.survey);
+  const mapped = COURSE_DESTINATIONS.filter(
+    id => id !== destination_id && anchors.has(id));
+  const unverified = reason => mapped.length
+    ? { status: 'unverified', reason, mapped_destinations: mapped }
+    : { status: 'unverified', reason };
+  if (!COURSE_DESTINATIONS.includes(destination_id)) {
+    return unverified('unknown_destination');
+  }
+  if (!anchors.has(destination_id)) return unverified('destination_not_checked');
   const anchorRequired = () => {
     const known = knownLandmarks(map, anchors);
     return known.length
@@ -213,7 +225,6 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
     }
   }
   if (!anchors.has(currentId)) return anchorRequired();
-  if (!anchors.has(destination_id)) return { status: 'unverified', reason: 'destination_not_checked' };
   if (currentId === destination_id) {
     return {
       status: 'at_destination',
@@ -230,7 +241,16 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
       pose = poseKey({ heading });
     } else if (facing != null && validPose({ facing })) {
       const canonical = canonicalFacing(map, anchors, tokenize(facing));
-      if (canonical != null) pose = `facing:${canonical}`;
+      if (canonical != null) {
+        const direct = `facing:${canonical}`;
+        const here = outgoing.get(currentId) ?? [];
+        const implied = new Set(here
+          .filter(edge => edge.action === 'walk_straight' && edge.entry_pose &&
+            anchors.get(edge.to).landmark === canonical)
+          .map(edge => poseKey(edge.entry_pose)));
+        pose = here.some(edge => poseKey(edge.entry_pose) === direct) || implied.size !== 1
+          ? direct : [...implied][0];
+      }
     }
   }
 
@@ -259,7 +279,7 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
         known_facings: [...usable].map(renderPose),
       };
     }
-    return { status: 'unverified', reason: 'no_checked_route' };
+    return unverified('no_checked_route');
   }
   return {
     status: 'route',

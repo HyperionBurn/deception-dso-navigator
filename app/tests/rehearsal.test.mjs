@@ -89,8 +89,8 @@ test('route API uses FLOOR_MAP by default and without the env var', async () => 
       const response = await callRoute(atSignA);
       assert.equal(response.status, 200);
       const body = await response.json();
-      assert.equal(body.status, 'needs_anchor');
-      assert.equal(body.reason, 'current_anchor_required');
+      assert.equal(body.status, 'unverified');
+      assert.equal(body.reason, 'destination_not_checked');
     });
   }
 });

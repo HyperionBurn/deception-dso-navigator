@@ -129,9 +129,15 @@ Defaults (match the organisers' official bridge): `--io robot`, `--mic vad` (voi
 1. **Preflight** all PASS (or note which FAIL).
 2. **Greeting:** after start, the robot says "أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an AI robot guide. Where would you like to go?"
 3. **Arabic request:** after the wake word, say "أبغى مكان هادي أسوي فيه مكالمة". Expect the Arabic reply "تبي كابينة مكالمات؟" (call booth?).
-4. **Confirm:** "إيه". Expect Arabic confirmation + an English line starting "Operator, we're going to a call booth…" and a question about where the robot is.
-5. **Operator line:** "Operator here, at sign A facing the kitchen." Expect it to check the route and then **hold** and ask what the operator can see (the real map is still empty; that is correct behaviour).
-6. **English + destination change:** "English please, actually take me to the kitchen." Expect English, "Operator, stop." (or hold) and the new destination confirmed.
+4. **Confirm (unmapped place):** "إيه". Expect an Arabic reply that the call booths are not mapped yet, offering the team tables or the kitchen, plus "Operator, hold position." Only the team tables and the kitchen are mapped so far; that is correct behaviour.
+5. **Real route:** say "المطبخ" (the kitchen). Expect an Arabic confirmation, "Operator, we're going to the kitchen" and a question about where the robot is. Then say the operator lines one at a time and note each reply:
+   - "Operator here, at the pitch room door, facing reception." Expect "Operator, walk straight and stop at the purple pillar with the green speech bubble."
+   - "Done." Expect "…walk straight and stop at the peach pillar."
+   - "Done." Expect "…turn left. Walk straight and stop at the cafeteria menu boards."
+   - "Done." Expect "Operator, stop here. Can you confirm we're at the cafeteria menu boards?"
+   - "Confirmed." Expect the arrival announcement in Arabic.
+   **These directions were drafted from a video and nobody has walked them.** If the operator actually walks them, write down any wrong turn or landmark. With the robot standing still you can still say the operator lines to test the dialogue.
+6. **English + destination change:** start the kitchen route again and, after the first "Done", say "English please, actually take me to the team tables." Expect English, "Operator, stop." and a fresh instruction for the new destination.
 7. **Interruption:** talk over the robot while it speaks. Expect it to stop speaking within about 0.5 s. If it instead keeps interrupting **itself**, restart with `--half-duplex` and note that.
 8. **Fact question:** "What bus goes to Dubai Silicon Oasis?" Expect "One moment" then an answer (routes 50, 320, 365, 366, X25).
 9. **Hindi (optional):** "मुझे रसोई जाना है". Expect a Hindi reply and an English operator line.
@@ -145,7 +151,8 @@ Defaults (match the organisers' official bridge): `--io robot`, `--mic vad` (voi
 
 - **Works today (tested against production):** greeting; Arabic/English/Hindi understanding and replies (Arabic and Hindi audio verified clean by transcribing the agent's own speech); clarifying questions; separate English operator lines; destination changes; route tool calls; facts via research; recognising requests under loud background music.
 - **Works on the rehearsal (fictional) map only:** multi-step routes (new step after every "Done", stop, confirm, arrival) and re-planning after a destination change.
-- **Not yet:** **real floor directions.** The production floor map is empty until the team walks the floor and records signs and legs (`qa/SURVEY FORMAT.md`, then `npm run map:ingest` in `app/`). Until then the agent will hold at every step. This is expected.
+- **Real floor directions for two places only:** the team tables and the kitchen (the cafeteria), in both directions along pitch room door → purple pillar with the green speech bubble → peach pillar → cafeteria menu boards. These legs were drafted from a video (`qa/FLOOR FROM VIDEO.md`) and have **not been walked**; the operator's confirmation at each stop is the check.
+- **Not yet:** the meeting room, the conference room and the four call booths. They are not located, so the agent says they are not mapped and offers the two mapped places. New places go into `qa/survey.txt` (`qa/SURVEY FORMAT.md`), then `npm run map:ingest` in `app/`.
 - **Never run on the robot before:** robot mode of the bridge (written exactly from the AgiBot docs and the organisers' bridge, unit-tested, but this slot is its first real run).
 
 ---

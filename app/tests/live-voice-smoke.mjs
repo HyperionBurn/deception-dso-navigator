@@ -11,7 +11,7 @@ const ttsVoice = 'EXAVITQu4vr4xnSDxMaL';
 const turns = [
   ['Arabic visitor', 'أبغى أروح غرفة الاجتماعات، لو سمحت.', /[\u0600-\u06ff]/, /غرفة|الاجتماعات/],
   ['English destination change', 'English please. Actually, I need the kitchen instead.', /kitchen/i, /kitchen/i],
-  ['Unmapped operator anchor', 'Operator here. I am stopped at the test blue sign, facing the white door.', /blue sign/i, /verified|mapped|unable|cannot|hold|match|recogni|what (can|do) you see/i],
+  ['Unmapped operator anchor', 'Operator here. I am stopped at the test blue sign, facing the white door.', /blue sign/i, /verified|mapped|unable|cannot|hold|match|recogni|(what|which) (can|do) you see|can you see|pillar|pitch room|menu boards/i],
 ];
 const state = { metadata: null, audioBytes: 0, lastAudio: 0, replies: [], transcripts: [] };
 let stage = 'configuration';
@@ -109,6 +109,7 @@ try {
     await until(() => state.transcripts.length > t && state.audioBytes > bytes
       && state.replies.slice(r).some(text => reply.test(text)) && idle(), 21000);
     assert(state.transcripts.slice(t).some(text => heard.test(text)));
+    assert(!state.replies.slice(r).some(text => /tool call|next_route_step|switched to/i.test(text)));
     console.log(JSON.stringify({ turn: label, syntheticTranscript: state.transcripts.slice(t),
       replies: state.replies.slice(r), nonSilentReplyBytes: state.audioBytes - bytes }));
   }
