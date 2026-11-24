@@ -10,3 +10,5 @@ __pycache__/
 # Superseded by robot/UPDATED RUNBOOK.md; keep the old local PDF outside Git.
 /robot/Robot A - Deception Runbook.pdf
 /robot/bridge/logs/
+# esbuild output for the talk page (built by `npm run build`)
+/app/static/talk/
