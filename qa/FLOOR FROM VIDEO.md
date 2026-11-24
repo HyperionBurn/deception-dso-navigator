@@ -32,7 +32,8 @@ striped walkway, looking down it toward the reception hall.
 | Pitch room door | Black wall with a steel bin; blue pillar just beyond; the striped walkway starts here. | 0:14-0:17 | Proposed start, sign A |
 | Striped walkway | White floor with dark stripes, runs straight to the reception hall. | 0:16-0:19, 0:28, 0:38, 2:04 | Spine of every route |
 | Team tables | Right of the walkway. Grey carpet with coloured squares, white desks, purple pillar with a green speech bubble at the near corner, peach pillar further on. A black "X2" robot case stands by the pitch room's glass wall. | 0:20-0:27, 0:33-0:37, 1:02-1:06 | Team tables |
-| Black lattice screen | Left of the walkway, after the blue pillar. A counter with "PIZZA" letters is behind it. | 0:28-0:32 | Junction, sign B |
+| Black lattice screen | Left of the walkway, after the blue pillar. A counter with "PIZZA" letters is behind it. | 0:28-0:32 | Passed on the way |
+| Peach pillar | Right of the walkway, with a whiteboard panel and a yellow shelf. The cafeteria opens on the left directly opposite. | 0:37-0:38, 1:02-1:06 | Junction, sign B |
 | Cafeteria | Left of the walkway, after the lattice screen, behind dark blue planter boxes. Round white tables, wooden chairs, tall striped bar tables, menu boards, a red-framed TV over a pink cabinet, a glass display case, a green plant wall in the far corner. | 0:38-1:10; narration 0:39 "Now we're entering the cafeteria" | Kitchen with tables and food |
 | Printer nook | Behind the green plant wall: corridor with coloured carpet squares, grey lockers, chalk sign "PRINTER SCANNER LOCKERS", green-walled nook with a printer that opens back onto the walkway and team tables. | 1:10-1:20; narration 1:14 | Not a destination |
 | Private offices | Frosted glass doors with purple Dtec plaques (one reads "Mappers Technical Services - FZCO"). | 1:22-1:37; narration 1:25 "small private rooms" | Tenant offices, **not call booths** |
@@ -60,12 +61,29 @@ and prints these routes from the proposed start:
 
 1. Team tables: walk straight, stop at the purple pillar with the green
    speech bubble.
-2. Kitchen: on to the black lattice screen, turn left, stop at the cafeteria
-   menu boards.
+2. Kitchen: on to the peach pillar, turn left, stop at the cafeteria menu
+   boards.
 
 Confidence: the side each place is on (team tables right, cafeteria left) is
 clear in several frames. Stop points and the return legs are guesses until
 walked.
+
+## Camera path (COLMAP)
+
+Structure-from-motion on the 2-per-second frames (pycolmap 4.2.1, SIFT,
+sequential matching) did **not** produce one floor path. IMG_3440 came out
+as nine separate fragments covering 282 of 473 frames, each in its own
+coordinate frame and scale, so they cannot be laid over each other as a
+plan. The stretch from the pitch room door along the walkway (0:10-0:28)
+has no pose at all. The other two clips split into three and four fragments.
+Fast pans, glass and plain white walls are the cause.
+
+What it does settle: the turn into the cafeteria at 0:38-0:41 is a left turn
+of about 90 degrees. Two fragments measure it independently (88 and 113
+degrees), and the frame-motion timeline agrees on the direction. That is the
+only turn the draft legs rely on.
+
+Plots and tables: `.cache/floor/path_<clip>.png`, `colmap_summary.txt`.
 
 ## What is missing
 
@@ -74,7 +92,7 @@ walked.
 | Four call booths | Four of the eight destinations. Not in any frame. | Ask Adam or Seruga where they are, then film or photograph each one with its door. |
 | Meeting room and conference room | The narrator says "pitch room" only. We do not know which rooms the organisers mean. | Ask the organisers to point at both. |
 | Start spot and facing | Every route starts there. The robot and its case are at the pitch room end, so the draft assumes the pitch room door. | Confirm with MangoBot where the robot starts for filming. |
-| Signs | The operator needs something exact to read back. A pillar colour works, a taped letter is safer. | Tape `robot/markers/markers.pdf` at the start, the lattice screen, and each destination. |
+| Signs | The operator needs something exact to read back. A pillar colour works, a taped letter is safer. | Tape `robot/markers/markers.pdf` at the start, the peach pillar, and each destination. |
 | Turns and return legs | The narration names places, never "left" or "right", and no route was walked back. | One walk per leg in each direction, saying the turn out loud. |
 
 ## Verification walk (about 15 minutes)
