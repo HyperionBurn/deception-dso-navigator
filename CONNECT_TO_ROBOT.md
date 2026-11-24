@@ -116,7 +116,7 @@ If the raw microphone gives nothing, use the wake-word stream instead: run `pyth
 ## 8. Quick test (say these, note what it answers)
 
 1. Visitor, Arabic: "أبغى أروح المطبخ". Expect a short Arabic confirmation, then "Operator, we're going to the kitchen. Are we at the pitch room door, facing reception?"
-2. Operator: "Yes." (If the robot is somewhere else, say where it is and what it faces instead.) Expect "Operator, walk straight and stop at the purple pillar with the green speech bubble."
+2. Operator: "Yes." (If the robot is somewhere else, say where it is and what it faces instead.) Expect "Operator, walk straight and stop at the purple pillar."
 3. Operator: "Done." Expect "...walk straight and stop at the yellow pillar."
 4. Operator: "Done." Expect "...turn left. Walk straight and stop at the cafeteria menu boards."
 5. Operator: "Done." Expect "Operator, stop here. Can you confirm we're at the cafeteria menu boards?"
