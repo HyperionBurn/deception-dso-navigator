@@ -42,6 +42,7 @@ const NUMBER_WORDS = new Map([
 const STOPWORDS = new Set([
   'the', 'a', 'an', 'at', 'by', 'near', 'next', 'to', 'of', 'i', 'im', 'am',
   'we', 'are', 'is', 'standing', 'stopped', 'stop', 'facing', 'in', 'front',
+  'toward', 'towards', 'looking', 'look',
   'عند', 'جنب', 'قدام', 'انا', 'في', 'امام',
 ]);
 
