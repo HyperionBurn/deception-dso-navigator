@@ -45,6 +45,12 @@ const STOPWORDS = new Set([
   'عند', 'جنب', 'قدام', 'انا', 'في', 'امام',
 ]);
 
+// Words that say the place is somewhere else (far, ahead, behind), not "I am at it". English and Gulf Arabic.
+// A plain "I see the X" is NOT blocked: the agent asks "Can you see the X, the Y or the Z?" to find the position.
+const SIGHTING = new RegExp(
+  '\\b(?:far|ahead|behind|over there|from here|in the distance)\\b' +
+  '|(?<![\\p{L}])(?:بعيد|بعيده|بعيدة|خلفي|ورا|وراي)(?![\\p{L}])', 'iu');
+
 export const tokenize = value => {
   const text = value.normalize('NFC')
     .replace(/(^|[^\p{L}\p{N}])[Ss][Ii][Gg][Nn]\s+([A-F])(?![\p{L}\p{N}])/gu, '$1sign$2')
@@ -218,6 +224,8 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
   let currentId = current_id;
   if (current_landmark != null) {
     if (currentId != null || !validObservedLandmark(current_landmark)) return anchorRequired();
+    // A place described as far, ahead or behind is not where the operator stands. Ask where they stand.
+    if (SIGHTING.test(current_landmark)) return anchorRequired();
     const match = matchPhrases(
       [...anchors.values()].map(anchor => ({
         key: anchor.id, anchor, phrases: anchorPhrases(anchor),
