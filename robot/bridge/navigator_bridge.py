@@ -30,8 +30,8 @@ RATE = 16000
 FORMAT = 'pcm_16000'
 CHUNK_MS = 100
 CHUNK_BYTES = RATE * CHUNK_MS // 1000 * 2       # 3200 B of S16LE mono
-PUBLISH_MS = 50
-PUBLISH_BYTES = RATE * PUBLISH_MS // 1000 * 2   # 1600 B
+PUBLISH_MS = 100
+PUBLISH_BYTES = RATE * PUBLISH_MS // 1000 * 2   # 3200 B
 PLAYBACK_LOOKAHEAD = 0.3                       # seconds of audio queued ahead (org bridge: lead)
 TAIL_SECONDS = 0.5                             # speaking gate = queued audio + this (org: lead + 0.5)
 MIC_QUEUE_CHUNKS = 30                          # ~3 s of capture before dropping
@@ -631,14 +631,12 @@ class RobotIO:
             self._subscription(
                 ProcessedAudioOutput, self.PROCESSED_TOPIC, self._on_vad_audio,
                 QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=500,
-                           reliability=QoSReliabilityPolicy.BEST_EFFORT,
-                           durability=QoSDurabilityPolicy.TRANSIENT_LOCAL))
+                           reliability=QoSReliabilityPolicy.BEST_EFFORT))
         else:
             self._subscription(
                 AudioCapture, self.CAPTURE_TOPIC, self._on_raw_audio,
                 QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=500,
-                           reliability=QoSReliabilityPolicy.RELIABLE,
-                           durability=QoSDurabilityPolicy.VOLATILE))
+                           reliability=QoSReliabilityPolicy.BEST_EFFORT))
 
         self._focus_client = self._client(RequestAudioFocus, self.FOCUS_SRV)
         self._abandon_client = self._client(AbandonAudioFocus, self.ABANDON_SRV)
@@ -873,7 +871,7 @@ class RobotIO:
         playback.token_id = f'{self._pkg}-{self._token}'
         playback.info.channels = 1
         playback.info.sample_rate = RATE
-        playback.data.data = list(chunk)
+        playback.data.data = array('B', chunk)
         self._pub.publish(playback)
 
     def stop_playback(self):
@@ -1425,8 +1423,7 @@ def _preflight_ros(args, check):
         # Mic: listen on the VAD stream for 5 s.
         stats = {'count': 0, 'streams': set(), 'vad_begin': False}
         qos = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=500,
-                         reliability=QoSReliabilityPolicy.BEST_EFFORT,
-                         durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+                         reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
         def on_mic(msg):
             stats['count'] += 1
