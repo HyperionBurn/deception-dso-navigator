@@ -80,7 +80,6 @@ test('wrong origin, method, media type, body, or access code never reaches signi
     [{ body: '{}' }, 401],
     [{ body: '{"access_code":"short"}' }, 401],
     [{ body: JSON.stringify({ access_code: `${CODE}x` }) }, 401],
-    [{ body: JSON.stringify({ access_code: ` ${CODE}` }) }, 401],
   ]) {
     await expectError(await session.fetch(request(options)), code);
   }

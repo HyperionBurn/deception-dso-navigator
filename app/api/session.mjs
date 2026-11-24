@@ -82,7 +82,8 @@ export default {
       return json({ error: 'Invalid request.' }, 400);
     }
     const code = Object.hasOwn(payload, 'access_code') ? payload.access_code : undefined;
-    if (!validAccessCode(code) || !timingSafeEqual(digest(code), digest(config.accessCode))) {
+    if (!validAccessCode(code) ||
+      !timingSafeEqual(digest(code.trim()), digest(config.accessCode.trim()))) {
       return json({ error: 'Invalid access code.' }, 401);
     }
 
