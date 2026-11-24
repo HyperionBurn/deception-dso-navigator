@@ -6,8 +6,10 @@ const SESSION_TTL_SECONDS = 2 * 60 * 60;
 
 export function memoryStore(ttlMs = SESSION_TTL_SECONDS * 1000) {
   const sessions = new Map();
+  let last = null;
   return {
     kind: 'memory',
+    async latest() { return last; },
     async get(id, now = Date.now()) {
       const hit = sessions.get(id);
       if (!hit) return null;
@@ -16,6 +18,7 @@ export function memoryStore(ttlMs = SESSION_TTL_SECONDS * 1000) {
     },
     async set(id, state, now = Date.now()) {
       sessions.set(id, { at: now, state: structuredClone(state) });
+      last = id;
     },
   };
 }
@@ -39,6 +42,10 @@ export function upstashStore({ url, token, ttlSeconds = SESSION_TTL_SECONDS, fet
     },
     async set(id, state) {
       await run(['SET', `nav:${id}`, JSON.stringify(state), 'EX', String(ttlSeconds)]);
+      await run(['SET', 'nav:latest', id, 'EX', String(ttlSeconds)]);
+    },
+    async latest() {
+      return (await run(['GET', 'nav:latest'])) || null;
     },
   };
 }

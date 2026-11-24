@@ -34,19 +34,19 @@ export const DEMO_MAP = Object.freeze({
       cue: 'the team tables are in front of you', aliases: ['team table', 'tables', 'team area', 'طاولات الفرق'],
     },
     call_booth_1: {
-      name: 'booth one', type: 'place', kind: 'booth', see: 'the door of booth one', cue: door(1, 'one'),
+      name: 'booth one', short: 'B1', type: 'place', kind: 'booth', see: 'the door of booth one', cue: door(1, 'one'),
       aliases: ['booth 1', 'call booth 1', 'call booth one', 'first booth', 'كبينة 1', 'كبينة المكالمات 1'],
     },
     call_booth_2: {
-      name: 'booth two', type: 'place', kind: 'booth', see: 'the door of booth two', cue: door(2, 'two'),
+      name: 'booth two', short: 'B2', type: 'place', kind: 'booth', see: 'the door of booth two', cue: door(2, 'two'),
       aliases: ['booth 2', 'call booth 2', 'call booth two', 'second booth', 'كبينة 2', 'كبينة المكالمات 2'],
     },
     call_booth_3: {
-      name: 'booth three', type: 'place', kind: 'booth', see: 'the door of booth three', cue: door(3, 'three'),
+      name: 'booth three', short: 'B3', type: 'place', kind: 'booth', see: 'the door of booth three', cue: door(3, 'three'),
       aliases: ['booth 3', 'call booth 3', 'call booth three', 'third booth', 'كبينة 3', 'كبينة المكالمات 3'],
     },
     call_booth_4: {
-      name: 'booth four', type: 'place', kind: 'booth', see: 'the door of booth four', cue: door(4, 'four'),
+      name: 'booth four', short: 'B4', type: 'place', kind: 'booth', see: 'the door of booth four', cue: door(4, 'four'),
       aliases: ['booth 4', 'call booth 4', 'call booth four', 'fourth booth', 'كبينة 4', 'كبينة المكالمات 4'],
     },
     kitchen: {

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Second screen · Team Deception</title>
+  <link rel="stylesheet" href="./screen.css">
+  <script type="module" src="./screen.mjs"></script>
+</head>
+<body>
+  <main class="screen">
+    <header class="top">
+      <h1>Second screen</h1>
+      <p class="chip demo" id="demo-chip" hidden>DEMO DATA, not the real floor</p>
+      <p class="chip" id="link-chip">Not connected</p>
+    </header>
+
+    <form id="connect" class="connect">
+      <label for="code">Team access code</label>
+      <input id="code" type="password" autocomplete="off" minlength="12" required>
+      <button type="submit">Show latest session</button>
+    </form>
+
+    <section class="say" aria-live="polite">
+      <p class="label">Say to the operator</p>
+      <p class="line" id="say">Waiting for a session</p>
+    </section>
+
+    <section class="handover" id="handover" hidden>
+      <p class="label">Handover to a person</p>
+      <p id="handover-reason"></p>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Map</h2>
+        <svg id="map" viewBox="0 0 40 40" role="img" aria-label="Floor map with the robot position"></svg>
+      </section>
+      <section class="panel">
+        <h2>Route</h2>
+        <dl class="facts">
+          <div><dt>Going to</dt><dd id="dest">none</dd></div>
+          <div><dt>Robot is</dt><dd id="pos">unknown</dd></div>
+          <div><dt>How sure</dt><dd id="conf">unknown</dd></div>
+        </dl>
+        <ol id="steps" class="steps"></ol>
+        <p class="arrived" id="arrived" hidden>Arrived and confirmed by the operator</p>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>What happened</h2>
+      <ul id="log" class="log"></ul>
+    </section>
+  </main>
+</body>
+</html>
