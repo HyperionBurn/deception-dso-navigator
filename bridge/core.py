@@ -15,11 +15,14 @@ import array
 import asyncio
 import base64
 import collections
+import csv
+import datetime
 import inspect
 import json
 import logging
 import math
 import os
+import statistics
 import sys
 import time
 import uuid
@@ -214,11 +217,62 @@ def arabic_looks_dominant(text: str) -> bool:
 class Turn:
     """One thing the visitor said, from the end of their speech until the answer is heard."""
 
-    def __init__(self, t_end: float):
+    def __init__(self, t_end: float, number: int):
         self.t_end = t_end            # last loud mic chunk
+        self.number = number
+        self.wall = time.time()
         self.t_audio: Optional[float] = None    # first agent audio chunk received
         self.t_played: Optional[float] = None   # first sample really played
         self.timers: list = []        # pending "heard" / "one moment" timers
+
+
+# ------------------------------------------------------------------ latency log
+# Times are seconds on the bridge's own clock: only the differences mean something.
+LATENCY_FIELDS = ["wall_time", "session_id", "conversation_id", "turn",
+                  "t_speech_end", "t_first_audio", "t_first_played",
+                  "end_to_audio_ms", "audio_to_play_ms", "end_to_play_ms"]
+GAP_FIELDS = ("end_to_audio_ms", "audio_to_play_ms", "end_to_play_ms")
+
+
+def append_latency_row(path: str, row: dict) -> None:
+    new_file = not os.path.exists(path) or os.path.getsize(path) == 0
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=LATENCY_FIELDS)
+        if new_file:
+            writer.writeheader()
+        writer.writerow(row)
+
+
+def summarize_latency_csv(path: str) -> dict:
+    """Median and worst case of each gap. A turn with no answer is counted but not averaged."""
+    with open(path, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    summary = {"turns": len(rows),
+               "unanswered": sum(1 for r in rows if not r.get(GAP_FIELDS[2]))}
+    for field in GAP_FIELDS:
+        values = [int(r[field]) for r in rows if r.get(field)]
+        summary[field] = ({"n": len(values), "median": int(statistics.median(values)),
+                           "worst": max(values)} if values else None)
+    return summary
+
+
+def format_latency_summary(summary: dict) -> str:
+    lines = ["turns: %d (no answer: %d)" % (summary["turns"], summary["unanswered"])]
+    labels = {"end_to_audio_ms": "speech end -> first agent audio",
+              "audio_to_play_ms": "first agent audio -> first sample played",
+              "end_to_play_ms": "speech end -> first sample played (what the visitor feels)"}
+    for field in GAP_FIELDS:
+        stats = summary[field]
+        if stats:
+            lines.append("%s: median %d ms, worst %d ms (%d turns)"
+                         % (labels[field], stats["median"], stats["worst"], stats["n"]))
+        else:
+            lines.append("%s: no data" % labels[field])
+    return "\n".join(lines)
+
+
+def print_latency_summary(path: str) -> None:
+    print(format_latency_summary(summarize_latency_csv(path)))
 
 
 # ------------------------------------------------------------------ the core
@@ -273,6 +327,7 @@ class SessionCore:
         self._in_speech = False
         self._last_voiced = 0.0
         self._turn: Optional[Turn] = None
+        self._turn_count = 0
 
         # speaker side
         self._playing_until = 0.0      # when the audio we handed over should be finished
@@ -283,6 +338,7 @@ class SessionCore:
         self._negotiated = False
         self._ready_this_try = False
         self._audio_open = False
+        self._queued = False           # waiting in line at ElevenLabs
         self._negotiated_count = 0
         self._end_reason: Optional[str] = None
         self._outage_announced = False
@@ -390,7 +446,19 @@ class SessionCore:
         self._wake.set()
 
     def _sink_first_sample(self):
-        pass
+        """The speaker says sound really started. Safe to call from any thread."""
+        now = self.clock()
+        loop = self._loop
+        if loop is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(self._on_first_sample, now)
+
+    def _on_first_sample(self, when: float):
+        turn = self._turn
+        # Ignore local phrases: they play before the answer audio has arrived.
+        if turn is None or turn.t_audio is None or turn.t_played is not None or when < turn.t_audio:
+            return
+        turn.t_played = when
+        self._finish_turn()
 
     def _emit(self, event: dict) -> None:
         try:
@@ -453,8 +521,9 @@ class SessionCore:
         if not (self._in_session and self._audio_open):
             return
         cfg = self.config
-        self._cancel_turn_timers()
-        turn = self._turn = Turn(t_last_voiced)
+        self._finish_turn()                    # an earlier turn with no answer is logged as such
+        self._turn_count += 1
+        turn = self._turn = Turn(t_last_voiced, self._turn_count)
         waited = self.clock() - t_last_voiced
         turn.timers = [
             self._loop.call_later(max(0.0, cfg.heard_after_s - waited),
@@ -472,6 +541,35 @@ class SessionCore:
             for timer in self._turn.timers:
                 timer.cancel()
             self._turn.timers = []
+
+    def _finish_turn(self):
+        """Write the open turn to the latency log (gaps stay empty if it got no answer)."""
+        turn, self._turn = self._turn, None
+        if turn is None:
+            return
+        for timer in turn.timers:
+            timer.cancel()
+        if not self.config.latency_csv:
+            return
+
+        def ms(start, end):
+            return "" if start is None or end is None else int(round((end - start) * 1000))
+
+        def seconds(t):
+            return "" if t is None else "%.3f" % t
+
+        wall = datetime.datetime.fromtimestamp(turn.wall).isoformat(timespec="milliseconds")
+        row = {"wall_time": wall, "session_id": self.session_id,
+               "conversation_id": self.conversation_id or "", "turn": turn.number,
+               "t_speech_end": seconds(turn.t_end), "t_first_audio": seconds(turn.t_audio),
+               "t_first_played": seconds(turn.t_played),
+               "end_to_audio_ms": ms(turn.t_end, turn.t_audio),
+               "audio_to_play_ms": ms(turn.t_audio, turn.t_played),
+               "end_to_play_ms": ms(turn.t_end, turn.t_played)}
+        try:
+            append_latency_row(self.config.latency_csv, row)
+        except OSError as exc:
+            log.warning("could not write the latency log: %s", exc)
 
     # ------------------------------------------------------------------- session
     def _session_over(self) -> bool:
@@ -533,8 +631,8 @@ class SessionCore:
                 backoff = min(backoff * 2, cfg.backoff_max_s)
         finally:
             self._in_session = False
-            self._cancel_turn_timers()
-            self._turn = None
+            self._finish_turn()
+            self._turn_count = 0
             self._preroll.clear()
             self._emit({"type": "bridge_session_end", "session_id": self.session_id})
 
@@ -591,6 +689,7 @@ class SessionCore:
         cfg = self.config
         self._negotiated = False
         self._audio_open = False
+        self._queued = False
         self._end_reason = None
         self._first_audio_id = 0
         self._latest_audio = -1
@@ -674,6 +773,13 @@ class SessionCore:
             if isinstance(text, str) and text.strip():
                 self._touch()
                 self._safe_hook(self.on_agent_text, text)
+        elif kind == "client_tool_call":
+            await self._on_client_tool_call(event.get("client_tool_call") or {})
+        elif kind == "queue_status":
+            self._on_queue_status((event.get("queue_status_event") or {}).get("status"))
+        elif kind == "client_error":
+            message = (event.get("error_event") or {}).get("message")
+            raise LinkProblem("the server reported an error: %s" % (message,))
         elif kind == "agent_tool_request":
             request = event.get("agent_tool_request") or {}
             self._touch()
@@ -684,6 +790,31 @@ class SessionCore:
             if payload.get("tool_name") in self.config.route_tools \
                     and "at_destination" in str(payload.get("full_tool_result", "")):
                 self._route_until = None       # arrived: the route is over
+
+    async def _on_client_tool_call(self, call: dict):
+        """We use server (webhook) tools only. If a client tool is called anyway, say it failed,
+        so the agent does not wait for an answer that never comes."""
+        log.warning("the agent called client tool %r, but this bridge has none", call.get("tool_name"))
+        call_id = call.get("tool_call_id")
+        if call_id and call.get("expects_response", True):
+            await self._send_json({"type": "client_tool_result", "tool_call_id": call_id,
+                                   "result": "This robot has no client tools. Use a server tool.",
+                                   "is_error": True})
+
+    def _on_queue_status(self, status):
+        """ElevenLabs may put us in a waiting line (same handling as voice.mjs)."""
+        if status == "waiting" and self._negotiated and not self._queued:
+            self._queued = True
+            self._audio_open = False          # do not send mic audio while we wait in line
+            log.info("waiting in line at ElevenLabs")
+        elif status == "admitted" and self._queued:
+            self._queued = False
+            self._first_audio_id, self._latest_audio = 0, -1
+            self._begin_stop()                # stop any hold music
+            self._preroll.clear()
+            self._audio_open = True
+        elif status == "timed_out":
+            raise LinkProblem("the wait in line at ElevenLabs timed out")
 
     async def _on_metadata(self, meta: dict):
         agent_format = meta.get("agent_output_audio_format")
