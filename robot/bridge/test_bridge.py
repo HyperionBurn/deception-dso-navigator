@@ -788,6 +788,7 @@ class JudgeScreenTests(unittest.TestCase):
         self.assertIn('median 900 ms', page)
 
     def test_server_serves_live_transcript_on_localhost_only(self):
+        import urllib.error
         import urllib.request
         bridge = make_bridge()
         bridge.transcripts.append(('AGENT', 'Operator, stop here.'))
@@ -802,5 +803,11 @@ class JudgeScreenTests(unittest.TestCase):
             self.assertIn('<h1>Operator, turn left.</h1>', body)
             with self.assertRaises(Exception):
                 urllib.request.urlopen(url + 'other', timeout=5)
+            rebound = urllib.request.Request(url, headers={'Host': f'evil.example:{screen.port}'})
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                urllib.request.urlopen(rebound, timeout=5)
+            self.assertEqual(caught.exception.code, 403)
+            local = urllib.request.Request(url, headers={'Host': f'localhost:{screen.port}'})
+            self.assertIn('Operator, turn left.', urllib.request.urlopen(local, timeout=5).read().decode('utf-8'))
         finally:
             screen.close()
