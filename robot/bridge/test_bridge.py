@@ -751,3 +751,56 @@ class CameraMarkerEventTests(unittest.TestCase):
         self.feed(self.frame_with_marker(24, 60, 150))
         self.assertEqual(self.sent,
                          ['Camera: the kitchen marker is visible to the left.'])
+
+
+class JudgeScreenTests(unittest.TestCase):
+    def test_off_by_default(self):
+        seen = []
+
+        class Recorder:
+            def __init__(self, a):
+                seen.append(a)
+
+            def run(self):
+                return 0
+
+            def shutdown(self):
+                pass
+
+        with mock.patch.object(nb, 'Bridge', Recorder):
+            nb.main(['--io', 'laptop', '--log-dir', '.'])
+            nb.main(['--io', 'laptop', '--log-dir', '.', '--judge-screen', '8765'])
+        self.assertIsNone(seen[0].judge_screen)
+        self.assertEqual(seen[1].judge_screen, 8765)
+        self.assertIsNone(make_bridge().judge)
+
+    def test_page_shows_latest_operator_step_and_escapes_text(self):
+        lines = [('VISITOR/OP', 'وين المطبخ؟'),
+                 ('AGENT', 'Operator, walk straight and stop at the purple pillar.'),
+                 ('VISITOR/OP', '<script>alert(1)</script> Done.'),
+                 ('AGENT', 'Operator, walk straight and stop at the yellow pillar.'),
+                 ('AGENT', 'تمام.')]
+        page = nb.render_judge_page(lines, '2 turns, median 900 ms, worst 1200 ms')
+        self.assertIn('<h1>Operator, walk straight and stop at the yellow pillar.</h1>', page)
+        self.assertIn('وين المطبخ؟', page)
+        self.assertNotIn('<script>', page)
+        self.assertIn('&lt;script&gt;', page)
+        self.assertIn('median 900 ms', page)
+
+    def test_server_serves_live_transcript_on_localhost_only(self):
+        import urllib.request
+        bridge = make_bridge()
+        bridge.transcripts.append(('AGENT', 'Operator, stop here.'))
+        screen = nb.JudgeScreen(bridge, 0)
+        try:
+            self.assertEqual(screen._server.server_address[0], '127.0.0.1')
+            url = f'http://127.0.0.1:{screen.port}/'
+            body = urllib.request.urlopen(url, timeout=5).read().decode('utf-8')
+            self.assertIn('<h1>Operator, stop here.</h1>', body)
+            bridge.transcripts.append(('AGENT', 'Operator, turn left.'))
+            body = urllib.request.urlopen(url, timeout=5).read().decode('utf-8')
+            self.assertIn('<h1>Operator, turn left.</h1>', body)
+            with self.assertRaises(Exception):
+                urllib.request.urlopen(url + 'other', timeout=5)
+        finally:
+            screen.close()
