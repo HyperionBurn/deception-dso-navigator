@@ -7,7 +7,7 @@ const UPDATE = 'Voice of the Oasis Team Guide Update, 24 Nov 2026';
 export const EVENT_FACTS = Object.freeze([
   {
     question: 'What is the Voice of the Oasis hackathon?',
-    answer: 'Voice of the Oasis is a 24-hour hackathon at Dtec in Dubai Silicon Oasis on 24 and 25 November 2026, where twelve teams build voice agents for three challenges.',
+    answer: 'Voice of the Oasis is a 24-hour hackathon at Dtec in Dubai Silicon Oasis on 24 and 25 November 2026, where teams build voice agents for three challenges.',
     sources: [`${GUIDE}, page 1`],
   },
   {
@@ -22,8 +22,8 @@ export const EVENT_FACTS = Object.freeze([
   },
   {
     question: 'When do the hackathon pitches start?',
-    answer: 'Pitches to the jury start at 8:45 on Wednesday 25 November, after the code freeze at 8:30.',
-    sources: [`${GUIDE}, page 2`],
+    answer: 'The first guide set the code freeze at 8:30 and pitches from 8:45 on Wednesday 25 November. Each team gets 8 minutes; the final pitch order is still to come from the organisers.',
+    sources: [`${GUIDE}, page 2`, `${UPDATE}, pages 1 and 6`],
   },
   {
     question: 'When are the hackathon winners announced?',
