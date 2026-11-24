@@ -155,7 +155,12 @@ test('session negotiates before sending or playing PCM, echoes ping, and drops s
   socket.receive({ type: 'ping', ping_event: { event_id: 0 } });
   capture.onmessage(frame());
   socket.receive(audio(1));
-  assert.deepEqual(socket.sent, [{ type: 'conversation_initiation_client_data' }, { type: 'pong', event_id: 0 }]);
+  const sessionId = session.sessionId;
+  assert.match(sessionId, /^[A-Za-z0-9_-]{8,64}$/u, 'the navigation tools need a session id of this shape');
+  assert.deepEqual(socket.sent, [
+    { type: 'conversation_initiation_client_data', dynamic_variables: { session_id: sessionId, source: 'browser' } },
+    { type: 'pong', event_id: 0 },
+  ]);
   assert.equal(calls.sources.length, 0);
   assert.deepEqual(capture.controls, []);
 

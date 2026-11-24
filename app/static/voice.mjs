@@ -40,12 +40,17 @@ export class VoiceSession {
     const run = {
       ready, settle, abort: new AbortController(), sources: new Set(),
       firstAudioId: 0, latestAudio: -1, nextTime: 0, negotiated: false, queued: false,
+      sessionId: globalThis.crypto.randomUUID(), // the navigation tools key their state on this
       state: { phase: 'starting', mic: false, connected: false, speaker: false },
     };
     this.#run = run;
     this.#state(run, 'starting');
     if (this.#run === run) void this.#open(run, accessCode);
     return ready;
+  }
+
+  get sessionId() {
+    return this.#run?.sessionId ?? null;
   }
 
   stop() {
@@ -110,7 +115,8 @@ export class VoiceSession {
       const socket = new WebSocket(signedSocketUrl(result.signed_url ?? result.signedUrl), 'convai');
       run.socket = socket;
       socket.onopen = () => {
-        if (!this.#send(run, { type: 'conversation_initiation_client_data' })) {
+        const start = { type: 'conversation_initiation_client_data', dynamic_variables: { session_id: run.sessionId, source: 'browser' } };
+        if (!this.#send(run, start)) {
           this.#end(run, 'error', 'Could not initialize the voice connection.');
         }
       };
