@@ -6,6 +6,8 @@ import io as stdio
 import json
 import struct
 import sys
+import threading
+import time
 import types
 import unittest
 from unittest import mock
@@ -154,6 +156,46 @@ class EventTests(unittest.TestCase):
         bridge.on_event({'type': 'interruption'})
         self.assertTrue(bridge.play_q.empty())
         self.assertFalse(bridge.clock.active())
+
+    def _paced_bridge(self):
+        class RecordingIO:
+            def __init__(self, bridge):
+                self.chunks = []
+
+            def play(self, chunk):
+                self.chunks.append((time.monotonic(), chunk))
+
+            def stop_playback(self):
+                pass
+
+        bridge = make_bridge(io_backend=RecordingIO)
+        threading.Thread(target=bridge._playback_worker, daemon=True).start()
+        self.addCleanup(bridge.stop_event.set)
+        return bridge
+
+    def test_playback_keeps_real_time_pace(self):
+        bridge = self._paced_bridge()
+        audio = bytes(range(256)) * 125          # 32000 B = 1.0 s of pcm_16000
+        started = time.monotonic()
+        bridge.play_q.put(audio)
+        while (sum(len(c) for _, c in bridge.io.chunks) < len(audio)
+               and time.monotonic() - started < 3):
+            time.sleep(0.01)
+        elapsed = time.monotonic() - started
+        self.assertEqual(b''.join(c for _, c in bridge.io.chunks), audio)
+        # 1.0 s of audio with a 0.3 s lookahead is all published by about 0.7 s.
+        self.assertGreater(elapsed, 0.5)
+        self.assertLess(elapsed, 1.1)
+
+    def test_interruption_drops_audio_not_yet_published(self):
+        bridge = self._paced_bridge()
+        bridge.play_q.put(b'\x01\x00' * 32000)    # 2.0 s
+        time.sleep(0.25)
+        bridge.clear_playback()
+        published = len(bridge.io.chunks)
+        self.assertGreater(published, 0)
+        time.sleep(0.3)
+        self.assertEqual(len(bridge.io.chunks), published)
 
     def test_transcripts_and_correction(self):
         bridge = make_bridge()
