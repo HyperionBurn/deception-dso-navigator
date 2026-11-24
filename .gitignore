@@ -9,3 +9,4 @@ __pycache__/
 *.log
 # Superseded by robot/UPDATED RUNBOOK.md; keep the old local PDF outside Git.
 /robot/Robot A - Deception Runbook.pdf
+/robot/bridge/logs/
