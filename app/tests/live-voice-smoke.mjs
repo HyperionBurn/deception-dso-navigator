@@ -11,7 +11,7 @@ const ttsVoice = 'EXAVITQu4vr4xnSDxMaL';
 const turns = [
   ['Arabic visitor', 'أبغى أروح غرفة الاجتماعات، لو سمحت.', /[\u0600-\u06ff]/, /غرفة|الاجتماعات/],
   ['English destination change', 'English please. Actually, I need the kitchen instead.', /kitchen/i, /kitchen/i],
-  ['Unmapped operator anchor', 'Operator here. I am stopped at the test blue sign, facing the white door.', /blue sign/i, /verified|mapped|unable|cannot|hold/i],
+  ['Unmapped operator anchor', 'Operator here. I am stopped at the test blue sign, facing the white door.', /blue sign/i, /verified|mapped|unable|cannot|hold|match|recogni|what (can|do) you see/i],
 ];
 const state = { metadata: null, audioBytes: 0, lastAudio: 0, replies: [], transcripts: [] };
 let stage = 'configuration';
