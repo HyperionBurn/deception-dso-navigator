@@ -60,9 +60,7 @@ test('ids named like object properties do not crash the planner and are never ma
 });
 
 // The operator hears "Operator," plus the command, and the rule is 12 words or fewer after "Operator,".
-// Today the team-tables command is 13 words because its landmark is long, so this is a todo until the landmark is shortened.
-test('every command on the production map is short and has no compass word',
-  { todo: 'team tables command is 13 words: shorten its landmark in qa/survey.txt' }, () => {
+test('every command on the production map is short and has no compass word', () => {
   const heardWords = text => text.split(/\s+/u).filter(word => /[\p{L}\p{N}]/u.test(word)).length;
   let checked = 0;
   const poses = [{ heading: 'north' }, { heading: 'east' }, { heading: 'south' }, { heading: 'west' },
