@@ -56,6 +56,17 @@ python robot/bridge/navigator_bridge.py --io null
   transcript lines so the agent resumes the conversation.
 - Logs go to console and `robot/bridge/logs/<timestamp>.log`. The access code
   and signed URL are never printed.
+- **Motion guard**: every ROS topic/service the bridge opens passes
+  `guard_ros_name` — an audio-only allowlist plus a fragment denylist
+  (`locomotion`, `command`, `pnc_task`, `slam`, `nav`, `joint`, `hand`,
+  `relocal`, `mapping`, `mc_`, …). Anything else raises at startup.
+- **Fallback phrases** (`phrases/*.pcm`, rendered by `make_phrases.py`):
+  played locally with no network — CONNECTION LOST → "Operator, stop…" in
+  English + Arabic, reconnect → "I'm back…", >6 s of agent silence after a
+  user turn → "One moment." (once per turn).
+- **Latency log**: per turn, user-speech-end → first agent audio → first
+  frame played is appended to `robot/bridge/logs/latency-<ts>.csv`; the
+  median and worst case print on quit.
 
 ## "I'm listening" signals (robot mode)
 

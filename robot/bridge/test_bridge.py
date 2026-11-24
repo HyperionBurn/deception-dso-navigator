@@ -304,5 +304,144 @@ class DebouncerTests(unittest.TestCase):
         self.assertTrue(d.ready(now=12.0))
 
 
+class RosGuardTests(unittest.TestCase):
+    def test_allowlist_names_pass(self):
+        self.assertGreater(len(nb.ALLOWED_ROS_NAMES), 5)
+        for name in nb.ALLOWED_ROS_NAMES:
+            self.assertEqual(nb.guard_ros_name(name), name)
+
+    def test_motion_and_nav_names_refused(self):
+        for bad in ('/cmd_vel', '/aima/hal/locomotion/cmd',
+                    '/aima/te/pnc_task_request', '/aima/te/integrated_command',
+                    '/slam/lidar_odom', '/aima/hal/arm/joint_state',
+                    '/foo/hand_pose', '/navigate_to_pose', '/nav/goal',
+                    '/aimdk_5Fmsgs/srv/SetMcAction',
+                    '/aima/hal/relocalization_pose', '/mapping/start'):
+            with self.assertRaises(ValueError, msg=bad):
+                nb.guard_ros_name(bad)
+
+    def test_unknown_name_refused_even_if_harmless(self):
+        with self.assertRaises(ValueError):
+            nb.guard_ros_name('/aima/hal/audio/experimental')
+
+
+class StallWatcherTests(unittest.TestCase):
+    def test_fires_once_after_window(self):
+        w = nb.StallWatcher(seconds=6.0)
+        w.note_transcript(now=100.0)
+        self.assertFalse(w.should_fire(now=104.0))
+        self.assertTrue(w.should_fire(now=106.0))
+        self.assertFalse(w.should_fire(now=107.0))   # once per turn
+
+    def test_agent_audio_before_deadline_blocks(self):
+        w = nb.StallWatcher(seconds=6.0)
+        w.note_transcript(now=100.0)
+        w.note_audio(now=103.0)
+        self.assertFalse(w.should_fire(now=200.0))
+
+    def test_new_turn_rearms(self):
+        w = nb.StallWatcher(seconds=6.0)
+        w.note_transcript(now=100.0)
+        w.note_audio(now=101.0)
+        w.note_transcript(now=110.0)
+        self.assertTrue(w.should_fire(now=116.5))
+
+    def test_no_turn_no_fire_and_reset(self):
+        w = nb.StallWatcher(seconds=6.0)
+        self.assertFalse(w.should_fire(now=100.0))
+        w.note_transcript(now=100.0)
+        w.reset()
+        self.assertFalse(w.should_fire(now=200.0))
+
+
+class PhrasePlayerTests(unittest.TestCase):
+    def test_plays_file_into_play_queue(self):
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, 'wait_en.pcm'), 'wb') as fh:
+                fh.write(b'\x01\x02' * 1600)
+            bridge = make_bridge()
+            player = nb.PhrasePlayer(bridge, directory=tmp)
+            player.play('wait_en')
+            self.assertEqual(bridge.play_q.get_nowait(), b'\x01\x02' * 1600)
+
+    def test_missing_file_skipped_not_fatal(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            bridge = make_bridge()
+            player = nb.PhrasePlayer(bridge, directory=tmp)
+            player.play('lost_en', 'lost_ar')
+            player.play('lost_en')      # warning only once, never raises
+            self.assertTrue(bridge.play_q.empty())
+
+
+class RmsTests(unittest.TestCase):
+    def test_silence_and_loud(self):
+        self.assertEqual(nb.rms_i16(b'\x00' * 3200), 0.0)
+        loud = pcm([8000] * 1600)
+        self.assertAlmostEqual(nb.rms_i16(loud), 8000.0, places=0)
+
+    def test_odd_bytes_ignored(self):
+        self.assertEqual(nb.rms_i16(b'\xff'), 0.0)
+
+
+class LatencyLogTests(unittest.TestCase):
+    def _turn(self, log, loud_at=10.0, transcript_at=11.0,
+              audio_at=12.0, played_at=12.5):
+        log.note_mic(pcm([5000] * 1600), now=loud_at)
+        log.note_mic(b'\x00' * 3200, now=loud_at + 0.2)   # silence keeps end
+        log.note_transcript(now=transcript_at)
+        log.note_agent_audio(now=audio_at)
+        log.note_played(now=played_at)
+
+    def test_full_turn_computes_deltas(self):
+        log = nb.LatencyLog(now=lambda: 0.0)
+        self._turn(log)
+        self.assertEqual(len(log._rows), 1)
+        row = log._rows[0]
+        self.assertEqual(row['speech_end'], 10.0)
+        self.assertEqual(row['played_at'], 12.5)
+        self.assertIn('median 2500 ms, worst 2500 ms', log.summary())
+
+    def test_mic_rms_floor_gates_speech_end(self):
+        log = nb.LatencyLog(now=lambda: 0.0)
+        log.note_mic(b'\x00' * 3200, now=5.0)          # silent: not speech
+        log.note_transcript(now=6.0)
+        log.note_agent_audio(now=7.0)
+        log.note_played(now=7.5)
+        self.assertEqual(log._rows, [])                 # no speech_end -> no turn
+
+    def test_only_first_audio_and_first_play_count(self):
+        log = nb.LatencyLog(now=lambda: 0.0)
+        self._turn(log, audio_at=12.0, played_at=12.4)
+        log._turn = {'speech_end': 10.0, 'transcript_at': 11.0,
+                     'speech_end_wall': 0.0}
+        log.note_agent_audio(now=13.0)
+        log.note_agent_audio(now=14.0)                  # later chunks ignored
+        log.note_played(now=14.5)
+        self.assertEqual(log._rows[-1]['agent_at'], 13.0)
+
+    def test_summary_median_and_worst(self):
+        log = nb.LatencyLog(now=lambda: 0.0)
+        self._turn(log, played_at=13.0)                 # 3000 ms
+        self._turn(log, played_at=11.0)                 # 1000 ms
+        self._turn(log, played_at=12.0)                 # 2000 ms
+        self.assertEqual(log.summary(),
+                         '3 turns, median 2000 ms, worst 3000 ms')
+
+    def test_csv_written(self):
+        import csv as csvmod, tempfile, os
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'lat.csv')
+            log = nb.LatencyLog(path=path, now=lambda: 0.0)
+            self._turn(log)
+            log.close()
+            with open(path, newline='') as fh:
+                rows = list(csvmod.reader(fh))
+        self.assertEqual(rows[0], list(nb.LatencyLog.FIELDS))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[1][2:], ['1000', '2000', '2500'])
+
+
 if __name__ == '__main__':
     unittest.main()

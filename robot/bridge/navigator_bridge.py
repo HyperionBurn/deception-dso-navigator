@@ -13,6 +13,7 @@ never publishes motion or control topics.
 import argparse
 import base64
 import collections
+import csv
 import datetime
 import json
 import os
@@ -50,6 +51,46 @@ USER_SPEAK_SECONDS = 1.5
 THINK_SECONDS = 6.0
 TOUCH_DEBOUNCE_SECONDS = 2.0
 SIGNAL_PRIORITY = 6   # below system fault emojis/LEDs so safety preempts us
+
+# --- motion guard ------------------------------------------------------------
+# Every ROS topic/service the bridge creates must pass guard_ros_name: it has
+# to be on this audio-only allowlist AND free of motion/navigation fragments.
+# Anything else raises at startup.
+FORBIDDEN_NAME_PARTS = (
+    'locomotion', 'command', 'upper_body', 'pnc_task', 'mc_', 'setmc',
+    'migratesystemstate', 'joint', 'hand', 'slam', 'nav', 'relocal', 'mapping',
+)
+ALLOWED_ROS_NAMES = frozenset({
+    '/aima/hal/audio/capture',
+    '/agent/process_audio_output',
+    '/aima/hal/audio/playback',
+    '/aima/hal/audio/play_state',
+    '/aima/hal/sensor/touch_head',
+    '/aimdk_5Fmsgs/srv/RequestAudioFocus',
+    '/aimdk_5Fmsgs/srv/AbandonAudioFocus',
+    '/aimdk_5Fmsgs/srv/StopAudioPlay',
+    '/aimdk_5Fmsgs/srv/SetVolume',
+    '/aimdk_5Fmsgs/srv/SetPmuLed',
+    '/aimdk_5Fmsgs/srv/PlayEmoji',
+})
+
+
+def guard_ros_name(name):
+    lowered = name.lower()
+    for part in FORBIDDEN_NAME_PARTS:
+        if part in lowered:
+            raise ValueError(
+                f'ROS name {name!r} refused: contains forbidden fragment {part!r}')
+    if name not in ALLOWED_ROS_NAMES:
+        raise ValueError(
+            f'ROS name {name!r} refused: not on the bridge allowlist')
+    return name
+
+
+# --- local fallback phrases ---------------------------------------------------
+PHRASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'phrases')
+STALL_SECONDS = 6.0       # no agent audio this long after a user turn -> "One moment."
+MIC_RMS_FLOOR = 300       # int16 RMS; quiet-room noise sits well below this
 PHASE_SIGNALS = {
     'connecting':    {'led': (3, 255, 170, 0),   'emoji': 50},   # flowing amber, open eyes
     'listening':     {'led': (0, 0, 200, 80),    'emoji': 10},   # steady cyan, calm
@@ -151,6 +192,141 @@ class Debouncer:
             return False
         self._last = now
         return True
+
+
+class StallWatcher:
+    """Fires once per user turn when no agent audio arrives within `seconds`
+    of the transcript — the bridge then plays the "One moment." clip."""
+
+    def __init__(self, seconds=STALL_SECONDS):
+        self.seconds = seconds
+        self._turn_at = None
+        self._audio_at = 0.0
+        self._fired = False
+
+    def note_transcript(self, now=None):
+        self._turn_at = time.monotonic() if now is None else now
+        self._fired = False
+
+    def note_audio(self, now=None):
+        self._audio_at = time.monotonic() if now is None else now
+
+    def reset(self):
+        self._turn_at = None
+        self._fired = False
+
+    def should_fire(self, now=None):
+        if self._turn_at is None or self._fired:
+            return False
+        if self._audio_at >= self._turn_at:
+            return False
+        now = time.monotonic() if now is None else now
+        if now - self._turn_at >= self.seconds:
+            self._fired = True
+            return True
+        return False
+
+
+class PhrasePlayer:
+    """Pushes pre-rendered local PCM clips (phrases/*.pcm, see make_phrases.py)
+    into the normal playback queue — plays with no network. Missing files are
+    skipped and logged once."""
+
+    def __init__(self, bridge, directory=PHRASE_DIR):
+        self._bridge = bridge
+        self._dir = directory
+        self._warned = set()
+
+    def play(self, *names):
+        for name in names:
+            try:
+                with open(os.path.join(self._dir, name + '.pcm'), 'rb') as fh:
+                    data = fh.read()
+            except OSError:
+                if name not in self._warned:
+                    self._warned.add(name)
+                    self._bridge.log(
+                        f'PHRASES: {name}.pcm missing (run make_phrases.py)')
+                continue
+            try:
+                self._bridge.play_q.put_nowait(data)
+            except queue.Full:
+                pass
+
+
+def rms_i16(pcm):
+    """RMS of a little-endian s16 PCM buffer."""
+    samples = array('h')
+    samples.frombytes(pcm[:len(pcm) - len(pcm) % 2])
+    if not samples:
+        return 0.0
+    return (sum(v * v for v in samples) / len(samples)) ** 0.5
+
+
+class LatencyLog:
+    """Per-turn timings: last loud mic frame (user speech end) -> first agent
+    audio received -> first frame pushed to the device. Completed turns are
+    appended to the CSV; summary() reports median and worst played latency."""
+
+    FIELDS = ('turn', 'speech_end', 'transcript_ms', 'agent_audio_ms', 'played_ms')
+
+    def __init__(self, path=None, rms_floor=MIC_RMS_FLOOR, now=time.monotonic):
+        self._floor = rms_floor
+        self._now = now
+        self._speech_end = None
+        self._turn = None
+        self._rows = []
+        self._fh = open(path, 'w', newline='', encoding='utf-8') if path else None
+        if self._fh:
+            csv.writer(self._fh).writerow(self.FIELDS)
+
+    def note_mic(self, pcm, now=None):
+        if rms_i16(pcm) >= self._floor:
+            self._speech_end = self._now() if now is None else now
+
+    def note_transcript(self, now=None):
+        if self._speech_end is None:
+            return
+        at = self._now() if now is None else now
+        self._turn = {'speech_end': self._speech_end, 'transcript_at': at,
+                      'speech_end_wall': time.time() - (at - self._speech_end)}
+
+    def note_agent_audio(self, now=None):
+        if self._turn is not None and 'agent_at' not in self._turn:
+            self._turn['agent_at'] = self._now() if now is None else now
+
+    def note_played(self, now=None):
+        if self._turn is None or 'agent_at' not in self._turn \
+                or 'played_at' in self._turn:
+            return
+        turn = self._turn
+        self._turn = None
+        turn['played_at'] = self._now() if now is None else now
+        self._rows.append(turn)
+        if self._fh:
+            csv.writer(self._fh).writerow([
+                len(self._rows),
+                datetime.datetime.fromtimestamp(
+                    turn['speech_end_wall']).isoformat(timespec='seconds'),
+                round((turn['transcript_at'] - turn['speech_end']) * 1000),
+                round((turn['agent_at'] - turn['speech_end']) * 1000),
+                round((turn['played_at'] - turn['speech_end']) * 1000),
+            ])
+            self._fh.flush()
+
+    def summary(self):
+        values = sorted(
+            (r['played_at'] - r['speech_end']) * 1000 for r in self._rows)
+        if not values:
+            return 'no completed turns'
+        mid = len(values) // 2
+        median = values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+        return f'{len(values)} turns, median {median:.0f} ms, worst {max(values):.0f} ms'
+
+    def close(self):
+        if self._fh:
+            self._fh.close()
+            self._fh = None
 
 
 def phase_for(state, now=None):
@@ -344,46 +520,51 @@ class RobotIO:
             target=self._executor.spin, daemon=True)
         self._spin_thread.start()
 
-        self._pub = self._node.create_publisher(
-            AudioPlayback, self.PLAYBACK_TOPIC, 10)
-        self._node.create_subscription(
+        self._pub = self._publisher(AudioPlayback, self.PLAYBACK_TOPIC, 10)
+        self._subscription(
             PlayStateChange, self.PLAY_STATE_TOPIC, self._on_play_state,
             QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=10,
                        reliability=QoSReliabilityPolicy.BEST_EFFORT,
                        durability=QoSDurabilityPolicy.TRANSIENT_LOCAL))
 
         if self._mic_mode == 'vad':
-            self._node.create_subscription(
+            self._subscription(
                 ProcessedAudioOutput, self.PROCESSED_TOPIC, self._on_vad_audio,
                 QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=500,
                            reliability=QoSReliabilityPolicy.BEST_EFFORT,
                            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL))
         else:
-            self._node.create_subscription(
+            self._subscription(
                 AudioCapture, self.CAPTURE_TOPIC, self._on_raw_audio,
                 QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=500,
                            reliability=QoSReliabilityPolicy.RELIABLE,
                            durability=QoSDurabilityPolicy.VOLATILE))
 
-        self._focus_client = self._node.create_client(
-            RequestAudioFocus, self.FOCUS_SRV)
-        self._abandon_client = self._node.create_client(
-            AbandonAudioFocus, self.ABANDON_SRV)
-        self._stop_client = self._node.create_client(
-            StopAudioPlay, self.STOP_SRV)
-        self._volume_client = self._node.create_client(
-            SetVolume, self.VOLUME_SRV)
+        self._focus_client = self._client(RequestAudioFocus, self.FOCUS_SRV)
+        self._abandon_client = self._client(AbandonAudioFocus, self.ABANDON_SRV)
+        self._stop_client = self._client(StopAudioPlay, self.STOP_SRV)
+        self._volume_client = self._client(SetVolume, self.VOLUME_SRV)
 
         if self._touch:
-            self._node.create_subscription(
-                TouchState, self.TOUCH_TOPIC, self._on_touch, 10)
+            self._subscription(TouchState, self.TOUCH_TOPIC, self._on_touch, 10)
         if self._signals:
-            self._led_client = self._node.create_client(SetPmuLed, self.LED_SRV)
-            self._emoji_client = self._node.create_client(PlayEmoji, self.EMOJI_SRV)
+            self._led_client = self._client(SetPmuLed, self.LED_SRV)
+            self._emoji_client = self._client(PlayEmoji, self.EMOJI_SRV)
 
         if self._volume is not None:
             self._set_volume(self._volume)
         self._request_focus()
+
+    def _publisher(self, msg_type, name, qos):
+        return self._node.create_publisher(
+            msg_type, guard_ros_name(name), qos)
+
+    def _subscription(self, msg_type, name, callback, qos):
+        return self._node.create_subscription(
+            msg_type, guard_ros_name(name), callback, qos)
+
+    def _client(self, srv_type, name):
+        return self._node.create_client(srv_type, guard_ros_name(name))
 
     def _call(self, client, request, tries=8, timeout=0.25, stamp_obj=None):
         """call_async + result wait with retries; ROS cross-host services are
@@ -586,6 +767,9 @@ class Bridge:
         self.error_state = False
         self.last_user_at = 0.0
         self._phase = None
+        self.latency = LatencyLog(getattr(args, 'latency_csv', None))
+        self._stall = StallWatcher()
+        self.phrases = PhrasePlayer(self)
 
     # -- logging ------------------------------------------------------------
 
@@ -659,6 +843,9 @@ class Bridge:
                 continue
             if self.muted or (self.half_duplex and self.clock.active()):
                 chunk = SILENCE
+            self.latency.note_mic(chunk)
+            if self.connected and self._stall.should_fire():
+                self.phrases.play('wait_en')
             self._send({'user_audio_chunk': base64.b64encode(chunk).decode('ascii')})
 
     # -- playback path -------------------------------------------------------
@@ -691,6 +878,7 @@ class Bridge:
                 if self.io:
                     try:
                         self.io.play(chunk)
+                        self.latency.note_played()
                     except Exception as error:
                         self.log(f'PLAYBACK: io error: {error}')
 
@@ -740,6 +928,7 @@ class Bridge:
                         'type': 'contextual_update',
                         'text': build_reconnect_text(self.transcripts),
                     })
+                    self.phrases.play('back_en')
             return
         if kind == 'ping':
             event_id = (event.get('ping_event') or {}).get('event_id')
@@ -750,6 +939,8 @@ class Bridge:
             audio = event.get('audio_event') or {}
             payload = audio.get('audio_base_64')
             if self.negotiated.is_set() and isinstance(payload, str) and payload:
+                self._stall.note_audio()
+                self.latency.note_agent_audio()
                 try:
                     self.play_q.put_nowait(base64.b64decode(payload))
                 except (ValueError, queue.Full):
@@ -761,6 +952,8 @@ class Bridge:
             return
         if kind == 'user_transcript':
             self.last_user_at = time.monotonic()
+            self._stall.note_transcript()
+            self.latency.note_transcript()
             self.transcript('VISITOR/OP',
                             (event.get('user_transcription_event') or {}).get('user_transcript'))
             return
@@ -871,6 +1064,7 @@ class Bridge:
             self.log('CONNECTION LOST')
             self.reconnected = True
             self.dropping = True
+            self.phrases.play('lost_en', 'lost_ar')
             if attempts >= len(RECONNECT_DELAYS):
                 self.error_state = True
                 self.log('ERROR: reconnect attempts exhausted; '
@@ -881,6 +1075,7 @@ class Bridge:
             attempts += 1
             self.log(f'STATE: reconnecting in {delay}s (attempt {attempts})')
             self.stop_event.wait(delay)
+        self.log(f'LATENCY: {self.latency.summary()}')
         return 0
 
     # -- console keys ---------------------------------------------------------
@@ -911,6 +1106,7 @@ class Bridge:
         self.reconnected = False
         self.dropping = False
         self.error_state = False
+        self._stall.reset()
         self.fresh_event.set()
 
     def head_touch(self):
@@ -933,6 +1129,7 @@ class Bridge:
                 self.io.set_phase('stopped')
             except Exception:
                 pass
+        self.latency.close()
         self.log('bridge stopped')
 
 
@@ -967,6 +1164,7 @@ def main(argv=None):
 
     stamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     args.log_file = os.path.join(args.log_dir, f'{stamp}.log')
+    args.latency_csv = os.path.join(args.log_dir, f'latency-{stamp}.csv')
     if args.io == 'robot':
         args.io_backend = lambda bridge: RobotIO(
             bridge, mic=args.mic, mic_channel=args.mic_channel, volume=args.volume,
