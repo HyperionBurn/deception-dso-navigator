@@ -56,3 +56,7 @@ test('research route answers event questions locally, in plain wording', async t
   }
   assert.equal(upstream.mock.callCount(), 0);
 });
+
+test('a question that only names HADI is not answered with the HADI fact', () => {
+  assert.equal(matchFact('How do I request maintenance through the HADI chatbot?', EVENT_FACTS), undefined);
+});

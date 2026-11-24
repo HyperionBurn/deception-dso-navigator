@@ -61,7 +61,7 @@ export const EVENT_FACTS = Object.freeze([
     sources: [`${UPDATE}, page 1`],
   },
   {
-    question: 'What is HADI the DSO chatbot?',
+    question: 'What is HADI?',
     answer: 'HADI is the AI text chatbot of Dubai Silicon Oasis; it covered 226 smart services by 2020, when the authority reported 95 percent of its services digitised.',
     sources: [`${GUIDE}, page 8`],
   },
