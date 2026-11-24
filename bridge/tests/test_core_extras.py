@@ -139,6 +139,20 @@ async def test_server_that_never_answers_the_first_message_is_retried():
         await wait_until(lambda: len(server.connections) >= 2, 4, "a second try")
 
 
+@async_test()
+async def test_a_slow_connection_is_announced_once_while_waiting(tmp_path):
+    from bridge.core import Phrases
+    from .fakes import FakeServer, write_phrases
+    json_path, directory = write_phrases(str(tmp_path))
+    server = FakeServer(send_metadata=False)          # connects, but never answers
+    async with Rig(server=server, phrases=Phrases.load(json_path, directory),
+                   slow_after_s=0.6, metadata_timeout_s=5.0) as rig:
+        rig.core.signal_presence()
+        await wait_until(lambda: 3333 in rig.sink.markers(), 3, "connection_slow")
+        await asyncio.sleep(0.5)
+        assert rig.sink.markers() == [3333]
+
+
 # ------------------------------------------------------------------- app hooks
 @async_test()
 async def test_app_hooks_receive_text_and_events_and_cannot_break_the_bridge():
