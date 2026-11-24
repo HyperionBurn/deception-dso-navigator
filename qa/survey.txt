@@ -17,7 +17,7 @@ survey: 2026-11-24 18:47 | video only, not yet walked | IMG_3440.MOV
 start: A facing reception
 
 anchor A: the pitch room door | aliases: pitch room, pitch room door, black wall, the start, steel bin, باب قاعة العروض, قاعة العروض
-anchor team_tables: the purple pillar with the green speech bubble | aliases: purple pillar, magenta pillar, speech bubble, green speech bubble, team tables, the desks, طاولات الفرق, العمود البنفسجي
+anchor team_tables: the purple pillar | aliases: the purple pillar with the green speech bubble, purple pillar, magenta pillar, speech bubble, green speech bubble, team tables, the desks, طاولات الفرق, العمود البنفسجي
 anchor B: the peach pillar | aliases: peach pillar, pink pillar, orange pillar, العمود الوردي, العمود البرتقالي
 anchor kitchen: the cafeteria menu boards | aliases: cafeteria, menu boards, the menu, kitchen, pizza counter, الكافتيريا, المطبخ, قائمة الطعام
 
