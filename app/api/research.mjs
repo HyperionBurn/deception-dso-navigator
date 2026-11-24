@@ -1,4 +1,5 @@
-import { createResearchClient } from '@workhub/voice-kit';
+import { createResearchClient, matchFact } from '@workhub/voice-kit';
+import { EVENT_FACTS } from '../lib/event-facts.mjs';
 import { accessCodeOk, getConfig, json, secretOk } from '../lib/session-config.mjs';
 
 const MAX_QUESTION = 500;
@@ -53,6 +54,9 @@ export default {
     if (typeof question !== 'string' || !question.trim() || question.length > MAX_QUESTION) {
       return json({ error: 'Invalid research request.' }, 400);
     }
+
+    const local = matchFact(question, EVENT_FACTS);
+    if (local) return json({ answer: local.answer, sources: local.sources, cached: true });
 
     const result = await researcher()(question).catch(() => null);
     if (!result || typeof result.answer !== 'string' || /could not verify/i.test(result.answer)) {
