@@ -37,7 +37,7 @@ export const EVENT_FACTS = Object.freeze([
   },
   {
     question: 'What are the hackathon prizes?',
-    answer: 'ElevenLabs gives each member of the three winning teams three months of its Pro tier, and the best ElevenLabs build gets three months of its Scale tier.',
+    answer: 'ElevenLabs gives each member of the three winning teams three months of its Pro tier, and each member of the team with the best use of ElevenLabs three months of its Scale tier.',
     sources: [`${GUIDE}, page 4`],
   },
   {
