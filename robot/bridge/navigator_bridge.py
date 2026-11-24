@@ -445,8 +445,9 @@ class JudgeScreen:
             def do_GET(self):
                 # Refuse other Host names so a web page cannot read the
                 # transcript through DNS rebinding.
-                port = self.server.server_address[1]
-                if self.headers.get('Host') not in (f'127.0.0.1:{port}', f'localhost:{port}'):
+                # Any port, so an SSH tunnel may use a different local port.
+                host = (self.headers.get('Host') or '').rsplit(':', 1)[0]
+                if host not in ('127.0.0.1', 'localhost'):
                     self.send_error(403)
                     return
                 if self.path not in ('/', '/index.html'):
