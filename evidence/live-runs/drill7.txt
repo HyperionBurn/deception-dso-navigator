@@ -1,0 +1,332 @@
+
+===== Run A: Arabic visitor to the kitchen =====
+AGENT: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an AI robot guide. Where would you like to go?
+
+USER (visitor is hungry (Arabic)): السلام عليكم، أنا جوعان، وين أقدر آكل؟
+AGENT: وعليكم السلام. [happy] تبي المطبخ؟
+PASS  Run A: Arabic visitor to the kitchen turn 1: visitor is hungry (Arabic)
+
+USER (visitor confirms kitchen): إيه، المطبخ.
+AGENT: تمام. Operator, we're going to the kitchen. Are we at the pitch room door, facing reception?
+PASS  Run A: Arabic visitor to the kitchen turn 2: visitor confirms kitchen
+
+USER (operator at pitch room door facing reception): Operator here. We are at the pitch room door, facing reception.
+AGENT: يلا نمشي. Operator, walk straight and stop at the purple pillar.
+PASS  Run A: Arabic visitor to the kitchen turn 3: operator at pitch room door facing reception
+
+USER (first leg done): Done.
+AGENT: Operator, walk straight and stop at the yellow pillar.
+PASS  Run A: Arabic visitor to the kitchen turn 4: first leg done
+
+USER (second leg done): Done.
+AGENT: Operator, turn left. Walk straight and stop at the cafeteria menu boards.
+PASS  Run A: Arabic visitor to the kitchen turn 5: second leg done
+
+USER (third leg done): Done.
+AGENT: Operator, stop here. Can you confirm we're at the cafeteria menu boards?
+PASS  Run A: Arabic visitor to the kitchen turn 6: third leg done
+
+USER (operator confirms arrival): Confirmed.
+AGENT: وصلنا، هذا المطبخ. [happy] بالعافية!
+PASS  Run A: Arabic visitor to the kitchen turn 7: operator confirms arrival
+
+--- stored transcript ---
+  agent: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi...
+  user: السلام عليكم، أنا جوعان، وين أقدر آكل؟
+  agent: وعليكم السلام. [happy] تبي المطبخ؟
+  user: إيه، المطبخ.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-a0c9a51327d43125","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\"}","tool_has_been_called":true,"tool_details":{"type":"webhook","method":"POST","url":"https://deception-dso-n
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-a0c9a51327d43125","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"needs_anchor\",\"reason\":\"current_anchor_required\",\"known_landmarks\":[\"the pitch room door\",\"the purple pillar\",\"the yellow pillar\",\"the cafeteria menu boards\"],\"likely_start\":{\"landmark\":\"the pitch room door\",\"facing\":\"reception\"}}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.2973
+  agent: تمام. Operator, we're going to the kitchen. Are we at the pitch room ...
+  user: Operator here. We are at the pitch room door, facing reception.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-a270223af796b1b9","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_landmark\": \"the pitch room door\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-a270223af796b1b9","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Walk straight and stop at the purple pillar.\",\"next_id\":\"team_tables\",\"expected_landmark\":\"the purple pillar\",\"exit_pose\":{\"facing\":\"reception\"},\"remaining_steps\":3,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.1
+  agent: يلا نمشي. Operator, walk straight and stop at the purple...
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-9c9bc47b01afb986","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_id\": \"team_tables\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool_details":{"ty
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-9c9bc47b01afb986","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Walk straight and stop at the yellow pillar.\",\"next_id\":\"sign_b\",\"expected_landmark\":\"the yellow pillar\",\"exit_pose\":{\"facing\":\"reception\"},\"remaining_steps\":2,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.192398
+  agent: Operator, walk straight and stop at the yellow pillar.
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-8a65c6ea91ff7342","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_id\": \"sign_b\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool_details":{"type":"
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-8a65c6ea91ff7342","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Turn left. Walk straight and stop at the cafeteria menu boards.\",\"next_id\":\"kitchen\",\"expected_landmark\":\"the cafeteria menu boards\",\"exit_pose\":{\"facing\":\"menu boards\"},\"remaining_steps\":1,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":tru
+  agent: Operator, turn left. Walk straight and stop at the cafeteria...
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-9a52436c1278d203","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_id\": \"kitchen\", \"facing\": \"menu boards\"}","tool_has_been_called":true,"tool_details":{"type
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-9a52436c1278d203","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"at_destination\",\"destination_id\":\"kitchen\",\"expected_landmark\":\"the cafeteria menu boards\",\"requires_physical_confirmation\":true}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.15484039508737624,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"webhook"}
+  agent: Operator, stop here. Can you confirm we're at the cafeteria menu...
+  user: Confirmed.
+  agent: وصلنا، هذا المطبخ. [happy] بالعافية!
+
+===== Run B: return leg, unmapped change, other place =====
+AGENT: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an AI robot guide. Where would you like to go?
+
+USER (visitor asks for team tables): Hi, take me to the team tables please.
+AGENT: Got it. Operator, we're going to the team tables. Are we at the pitch room door, facing reception?
+PASS  Run B: return leg, unmapped change, other place turn 1: visitor asks for team tables
+
+USER (operator at cafeteria facing menu boards): Operator. We are at the cafeteria menu boards, facing the menu boards.
+AGENT: Let's go. Operator, turn around. Walk straight and stop at the yellow pillar.
+PASS  Run B: return leg, unmapped change, other place turn 2: operator at cafeteria facing menu boards
+
+USER (first leg done): Done.
+AGENT: Operator, turn right. Walk straight and stop at the purple pillar.
+PASS  Run B: return leg, unmapped change, other place turn 3: first leg done
+
+USER (visitor changes to a call booth): Sorry, actually I need a call booth instead.
+AGENT: Operator, stop. Sure, a call booth.
+PASS  Run B: return leg, unmapped change, other place turn 4: visitor changes to a call booth
+
+USER (visitor confirms any booth): Yes, any booth is fine.
+AGENT: Sorry, the call booths aren't mapped yet. I can take you to the team tables or the kitchen. Operator, hold position.
+PASS  Run B: return leg, unmapped change, other place turn 5: visitor confirms any booth
+
+USER (visitor asks for the toilets): Okay. Where are the toilets?
+AGENT: In the main hall, beside the big Write Something wall.
+PASS  Run B: return leg, unmapped change, other place turn 6: visitor asks for the toilets
+
+--- stored transcript ---
+  agent: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi,...
+  user: Hi, take me to the team tables please.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-92bbf40bbef4f18c","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"team_tables\"}","tool_has_been_called":true,"tool_details":{"type":"webhook","method":"POST","url":"https://deception-d
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-92bbf40bbef4f18c","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"needs_anchor\",\"reason\":\"current_anchor_required\",\"known_landmarks\":[\"the pitch room door\",\"the purple pillar\",\"the yellow pillar\",\"the cafeteria menu boards\"],\"likely_start\":{\"landmark\":\"the pitch room door\",\"facing\":\"reception\"}}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.2481
+  agent: Got it. Operator, we're going to the team tables. Are we at the pitch room...
+  user: Operator. We are at the cafeteria menu boards, facing the menu boards.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-b6abeb38e4f1ea14","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"team_tables\", \"current_landmark\": \"the cafeteria menu boards\", \"facing\": \"the menu boards\"}","tool_has_been_ca
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-b6abeb38e4f1ea14","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Turn around. Walk straight and stop at the yellow pillar.\",\"next_id\":\"sign_b\",\"expected_landmark\":\"the yellow pillar\",\"exit_pose\":{\"facing\":\"team tables\"},\"remaining_steps\":2,\"destination_landmark\":\"the purple pillar\"}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0
+  agent: Let's go. Operator, turn around. Walk straight and stop at the...
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-9a40f6d86a3a9ab1","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"team_tables\", \"current_id\": \"sign_b\", \"facing\": \"team tables\"}","tool_has_been_called":true,"tool_details":{"t
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-9a40f6d86a3a9ab1","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Turn right. Walk straight and stop at the purple pillar.\",\"next_id\":\"team_tables\",\"expected_landmark\":\"the purple pillar\",\"exit_pose\":{\"facing\":\"pitch room\"},\"remaining_steps\":1,\"destination_landmark\":\"the purple pillar\"}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs
+  agent: Operator, turn right. Walk straight and stop at the purple...
+  user: Sorry, actually I need a call booth instead.
+  agent: Operator, stop. Sure, a call booth.
+  user: Yes, any booth is fine.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-990f60c42f56ba82","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"call_booth_1\", \"current_landmark\": \"the yellow pillar\", \"facing\": \"team tables\"}","tool_has_been_called":true,
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-990f60c42f56ba82","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"unverified\",\"reason\":\"destination_not_checked\",\"mapped_destinations\":[\"team_tables\",\"kitchen\"]}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.12975819408893585,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"webhook"}
+  agent: Sorry, the call booths aren't mapped yet. I can take you to the team ...
+  user: Okay. Where are the toilets?
+  agent: In the main hall, beside the big Write Something wall.
+
+===== Run C: English visitor, unmapped then kitchen, facing by landmark =====
+AGENT: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an AI robot guide. Where would you like to go?
+
+USER (visitor asks for the meeting room (unmapped)): Hello, can you take me to the meeting room?
+AGENT: Sorry, the meeting room isn't mapped yet. I can take you to the team tables or the kitchen.
+PASS  Run C: English visitor, unmapped then kitchen, facing by landmark turn 1: visitor asks for the meeting room (unmapped)
+
+USER (visitor picks the kitchen): Okay, the kitchen then.
+AGENT: Got it. Operator, we're going to the kitchen. Are we at the pitch room door, facing reception?
+PASS  Run C: English visitor, unmapped then kitchen, facing by landmark turn 2: visitor picks the kitchen
+
+USER (operator gives facing by landmark): Operator. The robot is at the purple pillar, facing the yellow pillar.
+AGENT: Let's go. Operator, walk straight and stop at the yellow pillar.
+PASS  Run C: English visitor, unmapped then kitchen, facing by landmark turn 3: operator gives facing by landmark
+
+USER (first leg done): Done.
+AGENT: Operator, turn left. Walk straight and stop at the cafeteria menu boards.
+PASS  Run C: English visitor, unmapped then kitchen, facing by landmark turn 4: first leg done
+
+USER (second leg done): Done.
+AGENT: Operator, stop here. Can you confirm we're at the cafeteria menu boards?
+PASS  Run C: English visitor, unmapped then kitchen, facing by landmark turn 5: second leg done
+
+USER (operator confirms arrival): Yes, confirmed.
+AGENT: We've arrived at the kitchen.
+PASS  Run C: English visitor, unmapped then kitchen, facing by landmark turn 6: operator confirms arrival
+
+--- stored transcript ---
+  agent: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi,...
+  user: Hello, can you take me to the meeting room?
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-b2ecada169d3fd30","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"meeting_room\"}","tool_has_been_called":true,"tool_details":{"type":"webhook","method":"POST","url":"https://deception-
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-b2ecada169d3fd30","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"unverified\",\"reason\":\"destination_not_checked\",\"mapped_destinations\":[\"team_tables\",\"kitchen\"]}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.12485499796457589,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"webhook"}
+  agent: Sorry, the meeting room isn't mapped yet. I can take you to the team...
+  user: Okay, the kitchen then.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-b116380d39706e61","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\"}","tool_has_been_called":true,"tool_details":{"type":"webhook","method":"POST","url":"https://deception-dso-n
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-b116380d39706e61","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"needs_anchor\",\"reason\":\"current_anchor_required\",\"known_landmarks\":[\"the pitch room door\",\"the purple pillar\",\"the yellow pillar\",\"the cafeteria menu boards\"],\"likely_start\":{\"landmark\":\"the pitch room door\",\"facing\":\"reception\"}}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.1465
+  agent: Got it. Operator, we're going to the kitchen. Are we at the pitch room...
+  user: Operator. The robot is at the purple pillar, facing the yellow pillar.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-89fd460873f2121a","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_landmark\": \"the purple pillar\", \"facing\": \"the yellow pillar\"}","tool_has_been_called":true
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-89fd460873f2121a","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Walk straight and stop at the yellow pillar.\",\"next_id\":\"sign_b\",\"expected_landmark\":\"the yellow pillar\",\"exit_pose\":{\"facing\":\"reception\"},\"remaining_steps\":2,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.164877
+  agent: Let's go. Operator, walk straight and stop at the yellow pillar...
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-a3a448ec28c2fd7e","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_id\": \"sign_b\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool_details":{"type":"
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-a3a448ec28c2fd7e","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Turn left. Walk straight and stop at the cafeteria menu boards.\",\"next_id\":\"kitchen\",\"expected_landmark\":\"the cafeteria menu boards\",\"exit_pose\":{\"facing\":\"menu boards\"},\"remaining_steps\":1,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":tru
+  agent: Operator, turn left. Walk straight and stop at the cafeteria...
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-889a2a9f4ac470f3","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_id\": \"kitchen\", \"facing\": \"menu boards\"}","tool_has_been_called":true,"tool_details":{"type
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-889a2a9f4ac470f3","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"at_destination\",\"destination_id\":\"kitchen\",\"expected_landmark\":\"the cafeteria menu boards\",\"requires_physical_confirmation\":true}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.13333349814638495,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"webhook"}
+  agent: Operator, stop here. Can you confirm we're at the cafeteria menu...
+  user: Yes, confirmed.
+  agent: We've arrived at the kitchen.
+
+===== Run D: operator confirms the likely start with one word =====
+AGENT: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an AI robot guide. Where would you like to go?
+
+USER (visitor asks for the kitchen): Take me to the kitchen please.
+AGENT: Got it.
+
+ Operator, we're going to the kitchen. Are we at the pitch room door, facing reception?
+PASS  Run D: operator confirms the likely start with one word turn 1: visitor asks for the kitchen
+
+USER (operator says yes): Yes.
+AGENT: Let's go. Operator, walk straight and stop at the purple pillar.
+PASS  Run D: operator confirms the likely start with one word turn 2: operator says yes
+
+USER (first leg done): Done.
+AGENT: Operator, walk straight and stop at the yellow pillar.
+PASS  Run D: operator confirms the likely start with one word turn 3: first leg done
+
+--- stored transcript ---
+  agent: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. ...
+  user: Take me to the kitchen please.
+  agent: Got it.
+
+
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-bb2f2c61690a109d","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\"}","tool_has_been_called":true,"tool_details":{"type":"webhook","method":"POST","url":"https://deception-dso-n
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-bb2f2c61690a109d","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"needs_anchor\",\"reason\":\"current_anchor_required\",\"known_landmarks\":[\"the pitch room door\",\"the purple pillar\",\"the yellow pillar\",\"the cafeteria menu boards\"],\"likely_start\":{\"landmark\":\"the pitch room door\",\"facing\":\"reception\"}}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.1278
+  agent: Operator, we're going to the kitchen. Are we at the pitch room door, ...
+  user: Yes.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-9a4155e8afbcdb90","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_landmark\": \"the pitch room door\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-9a4155e8afbcdb90","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Walk straight and stop at the purple pillar.\",\"next_id\":\"team_tables\",\"expected_landmark\":\"the purple pillar\",\"exit_pose\":{\"facing\":\"reception\"},\"remaining_steps\":3,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.1
+  agent: Let's go. Operator, walk straight and stop at the purple pillar...
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-994d4feceefa664d","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_id\": \"team_tables\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool_details":{"ty
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-994d4feceefa664d","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Walk straight and stop at the yellow pillar.\",\"next_id\":\"sign_b\",\"expected_landmark\":\"the yellow pillar\",\"exit_pose\":{\"facing\":\"reception\"},\"remaining_steps\":2,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.136605
+  agent: Operator, walk straight and stop at the yellow pillar.
+
+===== Run E: camera gives the position and confirms the arrival =====
+AGENT: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an AI robot guide. Where would you like to go?
+
+CAMERA NOTE: Camera: the robot is now at sign B.
+
+USER (camera knows the position; visitor asks for the kitchen): Take me to the kitchen please.
+AGENT: Got it.
+
+ Operator, we're going to the kitchen. Which way is the robot facing, reception or team tables?
+PASS  Run E: camera gives the position and confirms the arrival turn 1: camera knows the position; visitor asks for the kitchen
+
+USER (operator gives the facing): Facing reception.
+AGENT: Let's go. Operator, turn left. Walk straight and stop at the cafeteria menu boards.
+PASS  Run E: camera gives the position and confirms the arrival turn 2: operator gives the facing
+
+CAMERA NOTE: Camera: the robot is now at the kitchen marker.
+
+USER (camera confirms the arrival): Done.
+AGENT: Operator, stop here. We've arrived at the kitchen, the camera confirms it.
+PASS  Run E: camera gives the position and confirms the arrival turn 3: camera confirms the arrival
+
+--- stored transcript ---
+  agent: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an...
+  agent: 
+    tool call: {"type":"system","request_id":"contextual_update_0ba903a3","tool_name":"contextual_update","tool_id":null,"params_as_json":"{}","tool_has_been_called":true,"tool_details":null}
+  agent: 
+    tool result: {"request_id":"contextual_update_0ba903a3","tool_name":"contextual_update","tool_id":null,"result_value":"Camera: the robot is now at sign B.","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"system","result":null}
+  user: Take me to the kitchen please.
+  agent: Got it.
+
+
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-856fe7bb8d2414b7","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_landmark\": \"sign B\"}","tool_has_been_called":true,"tool_details":{"type":"webhook","method":"PO
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-856fe7bb8d2414b7","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"needs_anchor\",\"reason\":\"current_orientation_required\",\"known_facings\":[\"reception\",\"team tables\"]}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.1218121089041233,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"webhook"}
+  agent: Operator, we're going to the kitchen. Which way is the robot facing...
+  user: Facing reception.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-9e13df9baecd415a","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_landmark\": \"sign B\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool_details":{"t
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-9e13df9baecd415a","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Turn left. Walk straight and stop at the cafeteria menu boards.\",\"next_id\":\"kitchen\",\"expected_landmark\":\"the cafeteria menu boards\",\"exit_pose\":{\"facing\":\"menu boards\"},\"remaining_steps\":1,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":tru
+  agent: Let's go. Operator, turn left. Walk straight and stop at the cafeteria...
+  agent: 
+    tool call: {"type":"system","request_id":"contextual_update_3e00ef52","tool_name":"contextual_update","tool_id":null,"params_as_json":"{}","tool_has_been_called":true,"tool_details":null}
+  agent: 
+    tool result: {"request_id":"contextual_update_3e00ef52","tool_name":"contextual_update","tool_id":null,"result_value":"Camera: the robot is now at the kitchen marker.","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"system","result":null}
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-81221bfbd95ca820","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_landmark\": \"the kitchen marker\", \"facing\": \"menu boards\"}","tool_has_been_called":true,"too
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-81221bfbd95ca820","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"at_destination\",\"destination_id\":\"kitchen\",\"expected_landmark\":\"the cafeteria menu boards\",\"requires_physical_confirmation\":true}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.12085571908392012,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"webhook"}
+  agent: Operator, stop here. We've arrived at the kitchen, the camera confirms...
+
+===== Run F: camera corrects the position mid-route =====
+AGENT: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an AI robot guide. Where would you like to go?
+
+USER (visitor asks for the kitchen): Take me to the kitchen please.
+AGENT: Got it.
+
+ Operator, we're going to the kitchen. Are we at the pitch room door, facing reception?
+PASS  Run F: camera corrects the position mid-route turn 1: visitor asks for the kitchen
+
+USER (operator says yes): Yes.
+AGENT: Let's go. Operator, walk straight and stop at the purple pillar.
+PASS  Run F: camera corrects the position mid-route turn 2: operator says yes
+
+CAMERA NOTE: Camera: the robot is now at sign B.
+
+USER (camera says the robot is already at sign B): Done.
+AGENT: Operator, turn left. Walk straight and stop at the cafeteria menu boards.
+PASS  Run F: camera corrects the position mid-route turn 3: camera says the robot is already at sign B
+
+--- stored transcript ---
+  agent: أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi,...
+  user: Take me to the kitchen please.
+  agent: Got it.
+
+
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-a9b542afded1fe7b","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\"}","tool_has_been_called":true,"tool_details":{"type":"webhook","method":"POST","url":"https://deception-dso-n
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-a9b542afded1fe7b","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"needs_anchor\",\"reason\":\"current_anchor_required\",\"known_landmarks\":[\"the pitch room door\",\"the purple pillar\",\"the yellow pillar\",\"the cafeteria menu boards\"],\"likely_start\":{\"landmark\":\"the pitch room door\",\"facing\":\"reception\"}}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.1364
+  agent: Operator, we're going to the kitchen. Are we at the pitch room...
+  user: Yes.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-87c241c082d79a7f","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_landmark\": \"the pitch room door\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-87c241c082d79a7f","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Walk straight and stop at the purple pillar.\",\"next_id\":\"team_tables\",\"expected_landmark\":\"the purple pillar\",\"exit_pose\":{\"facing\":\"reception\"},\"remaining_steps\":3,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0.1
+  agent: Let's go. Operator, walk straight and stop at the purple pillar.
+  agent: 
+    tool call: {"type":"system","request_id":"contextual_update_f1688b36","tool_name":"contextual_update","tool_id":null,"params_as_json":"{}","tool_has_been_called":true,"tool_details":null}
+  agent: 
+    tool result: {"request_id":"contextual_update_f1688b36","tool_name":"contextual_update","tool_id":null,"result_value":"Camera: the robot is now at sign B.","is_error":false,"is_blocked":false,"tool_has_been_called":true,"tool_latency_secs":0,"error_type":"","raw_error_message":"","dynamic_variable_updates":[],"type":"system","result":null}
+  user: Done.
+  agent: 
+    tool call: {"type":"webhook","request_id":"chatcmpl-tool-b83d911b3247f4b3","tool_name":"next_route_step","tool_id":"tool_<id>","params_as_json":"{\"destination_id\": \"kitchen\", \"current_landmark\": \"sign B\", \"facing\": \"reception\"}","tool_has_been_called":true,"tool_details":{"t
+  agent: 
+    tool result: {"request_id":"chatcmpl-tool-b83d911b3247f4b3","tool_name":"next_route_step","tool_id":"tool_<id>","result_value":"{\"status\":\"step\",\"command\":\"Turn left. Walk straight and stop at the cafeteria menu boards.\",\"next_id\":\"kitchen\",\"expected_landmark\":\"the cafeteria menu boards\",\"exit_pose\":{\"facing\":\"menu boards\"},\"remaining_steps\":1,\"destination_landmark\":\"the cafeteria menu boards\"}","is_error":false,"is_blocked":false,"tool_has_been_called":tru
+  agent: Operator, turn left. Walk straight and stop at the cafeteria ...
+
+===== 28/28 expectations passed =====
+EXIT 0
