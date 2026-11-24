@@ -443,5 +443,182 @@ class LatencyLogTests(unittest.TestCase):
         self.assertEqual(rows[1][2:], ['1000', '2000', '2500'])
 
 
+class FakeBridge:
+    def __init__(self):
+        self.logs = []
+        self.mic = []
+
+    def log(self, text):
+        self.logs.append(text)
+
+    def feed_mic(self, chunk):
+        self.mic.append(chunk)
+
+    def head_touch(self):
+        pass
+
+
+class StreamLockTests(unittest.TestCase):
+    @staticmethod
+    def msg(stream_id, data=b'\x01\x02'):
+        vad = types.SimpleNamespace(value=0)
+        return types.SimpleNamespace(stream_id=stream_id, audio_data=data,
+                                     audio_vad_state=vad)
+
+    def test_locks_first_stream_and_drops_others(self):
+        bridge = FakeBridge()
+        io = nb.RobotIO(bridge, mic='vad')
+        io._on_vad_audio(self.msg(2, b'aa'))
+        io._on_vad_audio(self.msg(1, b'dropped'))
+        io._on_vad_audio(self.msg(2, b'bb'))
+        self.assertEqual(io._stream_lock, 2)
+        self.assertEqual(bridge.mic, [b'aa', b'bb'])
+
+    def test_pinned_stream_ignores_first_seen(self):
+        bridge = FakeBridge()
+        io = nb.RobotIO(bridge, mic='vad', mic_stream=2)
+        io._on_vad_audio(self.msg(1, b'dropped'))
+        io._on_vad_audio(self.msg(2, b'kept'))
+        self.assertEqual(bridge.mic, [b'kept'])
+
+
+class TokenBumpTests(unittest.TestCase):
+    def test_stop_playback_bumps_token_and_calls_stop(self):
+        io = nb.RobotIO(FakeBridge())
+
+        class Request:
+            pass
+
+        client = object()
+        io._srv = {'stop': types.SimpleNamespace(Request=Request)}
+        io._stop_client = client
+        calls = []
+        io._call = lambda c, r, **kw: calls.append((c, r)) or object()
+
+        token = io._token
+        io.stop_playback()
+        self.assertEqual(io._token, token + 1)
+        self.assertEqual(len(calls), 1)
+        self.assertIs(calls[0][0], client)
+        self.assertIsInstance(calls[0][1], Request)
+
+    def test_play_uses_bumped_token(self):
+        io = nb.RobotIO(FakeBridge())
+        published = []
+
+        class FakePlayback:
+            def __init__(self):
+                self.pkg_name = ''
+                self.token_id = ''
+                self.info = types.SimpleNamespace()
+                self.data = types.SimpleNamespace()
+
+        io._msg = {'AudioPlayback': FakePlayback}
+        io._pub = types.SimpleNamespace(publish=published.append)
+        io.play(b'\x00\x00')
+        io._token += 1
+        io.play(b'\x00\x00')
+        self.assertNotEqual(published[0].token_id, published[1].token_id)
+        self.assertTrue(published[1].token_id.endswith('-1'))
+
+
+class SessionUrlTests(unittest.TestCase):
+    def test_direct_mode_uses_elevenlabs(self):
+        with mock.patch.object(nb, 'direct_signed_url',
+                               return_value='wss://direct') as direct, \
+             mock.patch.object(nb, 'request_signed_url') as site:
+            self.assertEqual(
+                nb.session_url('direct', 'https://s', 'c', 'agent', 'key'),
+                'wss://direct')
+            direct.assert_called_once_with('agent', 'key')
+            site.assert_not_called()
+
+    def test_auto_prefers_site(self):
+        with mock.patch.object(nb, 'request_signed_url',
+                               return_value='wss://site'), \
+             mock.patch.object(nb, 'direct_signed_url') as direct:
+            self.assertEqual(
+                nb.session_url('auto', 'https://s', 'c', 'agent', 'key'),
+                'wss://site')
+            direct.assert_not_called()
+
+    def test_auto_falls_back_to_direct_on_site_failure(self):
+        with mock.patch.object(nb, 'request_signed_url',
+                               side_effect=RuntimeError('down')), \
+             mock.patch.object(nb, 'direct_signed_url',
+                               return_value='wss://direct') as direct:
+            self.assertEqual(
+                nb.session_url('auto', 'https://s', 'c', 'agent', 'key'),
+                'wss://direct')
+            direct.assert_called_once_with('agent', 'key')
+
+    def test_auto_without_key_reraises_site_error(self):
+        with mock.patch.object(nb, 'request_signed_url',
+                               side_effect=RuntimeError('down')), \
+             mock.patch.object(nb, 'direct_signed_url') as direct:
+            with self.assertRaises(RuntimeError):
+                nb.session_url('auto', 'https://s', 'c', 'agent', '')
+            direct.assert_not_called()
+
+    def test_site_mode_never_falls_back(self):
+        with mock.patch.object(nb, 'request_signed_url',
+                               side_effect=RuntimeError('down')), \
+             mock.patch.object(nb, 'direct_signed_url') as direct:
+            with self.assertRaises(RuntimeError):
+                nb.session_url('site', 'https://s', 'c', 'agent', 'key')
+            direct.assert_not_called()
+
+
+class PreflightFormatTests(unittest.TestCase):
+    def test_pass_and_fail_lines(self):
+        self.assertEqual(nb.fmt_check('mic', True, '3 msgs'),
+                         'PASS  mic — 3 msgs')
+        self.assertEqual(nb.fmt_check('mic', False), 'FAIL  mic')
+
+
 if __name__ == '__main__':
     unittest.main()
+
+
+class MarkerTrackerTests(unittest.TestCase):
+    def test_stable_after_three_frames(self):
+        t = nb.MarkerTracker(stable_frames=3, cooldown=20.0)
+        self.assertIsNone(t.note([2], now=0.0))
+        self.assertIsNone(t.note([2], now=0.5))
+        self.assertEqual(t.note([2], now=1.0), 2)
+
+    def test_gap_resets_streak(self):
+        t = nb.MarkerTracker(stable_frames=3)
+        t.note([2], now=0.0)
+        t.note([2], now=0.5)
+        t.note([], now=1.0)                      # lost sight of it
+        self.assertIsNone(t.note([2], now=1.5))
+        self.assertIsNone(t.note([2], now=2.0))
+        self.assertEqual(t.note([2], now=2.5), 2)
+
+    def test_debounce_once_per_cooldown(self):
+        t = nb.MarkerTracker(stable_frames=2, cooldown=20.0)
+        t.note([2], now=0.0)
+        self.assertEqual(t.note([2], now=0.5), 2)
+        self.assertIsNone(t.note([2], now=1.0))  # inside cooldown
+        self.assertIsNone(t.note([2], now=19.9))
+        self.assertEqual(t.note([2], now=21.0), 2)
+
+    def test_unknown_ids_ignored(self):
+        t = nb.MarkerTracker(stable_frames=2)
+        self.assertIsNone(t.note([99], now=0.0))
+        self.assertIsNone(t.note([99], now=0.5))
+        self.assertIsNone(t.note([99], now=1.0))
+
+    def test_marker_switch_picks_new_stable_id(self):
+        t = nb.MarkerTracker(stable_frames=2)
+        t.note([2], now=0.0)
+        t.note([2], now=0.5)                     # fires id 2
+        t.note([11], now=1.0)
+        self.assertEqual(t.note([11], now=1.5), 11)
+
+    def test_label_table_covers_plan(self):
+        self.assertEqual(nb.MARKER_LABELS[2], 'sign B')
+        self.assertEqual(nb.MARKER_LABELS[11], 'call booth 1')
+        self.assertEqual(nb.MARKER_LABELS[24], 'the kitchen')
+        self.assertEqual(len(nb.MARKER_LABELS), 14)
