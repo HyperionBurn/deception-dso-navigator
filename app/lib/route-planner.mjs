@@ -46,7 +46,9 @@ const STOPWORDS = new Set([
 ]);
 
 export const tokenize = value => {
-  const text = value.normalize('NFC').toLowerCase()
+  const text = value.normalize('NFC')
+    .replace(/(^|[^\p{L}\p{N}])[Ss][Ii][Gg][Nn]\s+([A-F])(?![\p{L}\p{N}])/gu, '$1sign$2')
+    .toLowerCase()
     .replace(/[ً-ٰٟ]/gu, '')
     .replace(/ـ/gu, '')
     .replace(/[أإآ]/gu, 'ا')
@@ -201,9 +203,16 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
   if (!anchors.has(destination_id)) return unverified('destination_not_checked');
   const anchorRequired = () => {
     const known = knownLandmarks(map, anchors);
-    return known.length
+    const result = known.length
       ? { status: 'needs_anchor', reason: 'current_anchor_required', known_landmarks: known }
       : { status: 'needs_anchor', reason: 'current_anchor_required' };
+    const start = map?.start;
+    if (current_id == null && current_landmark == null && start && anchors.has(start.anchor)) {
+      const pose = validPose({ facing: start.facing }) ? { facing: start.facing }
+        : validPose({ heading: start.heading }) ? { heading: start.heading } : {};
+      result.likely_start = { landmark: anchors.get(start.anchor).landmark, ...pose };
+    }
+    return result;
   };
 
   let currentId = current_id;

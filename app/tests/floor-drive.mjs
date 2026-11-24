@@ -13,6 +13,8 @@ if (!apiKey) {
 
 // Words that must never be spoken: tool names, field names, statuses, self-commentary.
 const LEAK = /tool call|next_route_step|research_fact|destination_id|current_id|current_landmark|needs_anchor|unverified|switched to|continue in english/i;
+// Longest spoken reply allowed in one turn, in words.
+const MAX_WORDS = 30;
 const results = [];
 function verdict(label, ok, detail = '') {
   results.push([label, ok]);
@@ -100,13 +102,19 @@ async function drive(name, turns) {
       return;
     }
     console.log(`AGENT: ${state.replies.at(-1).text}`);
-    for (const [i, { send: text, expect, reject, label }] of turns.entries()) {
+    for (const [i, { send: text, expect, reject, label, context }] of turns.entries()) {
       const since = {
         replies: state.replies.length,
         toolRequests: state.toolRequests,
         toolResponses: state.toolResponses,
         sentAt: Date.now(),
       };
+      for (const note of context ?? []) {
+        send({ type: 'contextual_update', text: note });
+        console.log(`
+CAMERA NOTE: ${note}`);
+        await pause(400);
+      }
       send({ type: 'user_message', text });
       console.log(`\nUSER (${label}): ${text}`);
       await waitIdle(since);
@@ -115,9 +123,12 @@ async function drive(name, turns) {
       const missing = expect && !expect.test(fresh);
       const unwanted = reject && reject.test(fresh);
       const leaked = LEAK.test(fresh);
-      verdict(`${name} turn ${i + 1}: ${label}`, !missing && !unwanted && !leaked,
+      const words = fresh.split(/\s+/u).filter(Boolean).length;
+      verdict(`${name} turn ${i + 1}: ${label}`,
+        !missing && !unwanted && !leaked && words <= MAX_WORDS,
         [missing ? `wanted ${expect}` : '', unwanted ? `must not match ${reject}` : '',
-          leaked ? 'spoke internal words' : ''].filter(Boolean).join('; '));
+          leaked ? 'spoke internal words' : '',
+          words > MAX_WORDS ? `too long: ${words} words` : ''].filter(Boolean).join('; '));
       if (!state.replies.length) break;
     }
   } finally {
@@ -138,7 +149,7 @@ const runA = [
   { label: 'operator at pitch room door facing reception',
     send: 'Operator here. We are at the pitch room door, facing reception.',
     expect: /purple pillar/i },
-  { label: 'first leg done', send: 'Done.', expect: /peach pillar/i },
+  { label: 'first leg done', send: 'Done.', expect: /yellow pillar/i },
   { label: 'second leg done', send: 'Done.', expect: /turn left[\s\S]*menu boards/i },
   { label: 'third leg done', send: 'Done.', expect: /confirm|menu boards/i },
   { label: 'operator confirms arrival', send: 'Confirmed.',
@@ -151,7 +162,7 @@ const runB = [
     expect: /operator|team tables/i },
   { label: 'operator at cafeteria facing menu boards',
     send: 'Operator. We are at the cafeteria menu boards, facing the menu boards.',
-    expect: /turn around[\s\S]*peach pillar/i },
+    expect: /turn around[\s\S]*yellow pillar/i },
   { label: 'first leg done', send: 'Done.', expect: /turn right[\s\S]*purple pillar/i },
   { label: 'visitor changes to a call booth', send: 'Sorry, actually I need a call booth instead.',
     expect: /stop/i },
@@ -171,17 +182,55 @@ const runC = [
   { label: 'visitor picks the kitchen', send: 'Okay, the kitchen then.',
     expect: /operator/i, reject: arabic },
   { label: 'operator gives facing by landmark',
-    send: 'Operator. The robot is at the purple pillar, facing the peach pillar.',
-    expect: /walk straight[\s\S]*peach pillar/i, reject: arabic },
+    send: 'Operator. The robot is at the purple pillar, facing the yellow pillar.',
+    expect: /walk straight[\s\S]*yellow pillar/i, reject: arabic },
   { label: 'first leg done', send: 'Done.', expect: /turn left[\s\S]*menu boards/i, reject: arabic },
   { label: 'second leg done', send: 'Done.', expect: /confirm|menu boards/i, reject: arabic },
   { label: 'operator confirms arrival', send: 'Yes, confirmed.',
     expect: /arrived|here|kitchen|cafeteria/i, reject: arabic },
 ];
 
+// Run D: the agent proposes the start position; the operator only says yes.
+const runD = [
+  { label: 'visitor asks for the kitchen', send: 'Take me to the kitchen please.',
+    expect: /are we at the pitch room door[\s\S]*reception/i, reject: arabic },
+  { label: 'operator says yes', send: 'Yes.',
+    expect: /walk straight[\s\S]*purple pillar/i, reject: arabic },
+  { label: 'first leg done', send: 'Done.', expect: /yellow pillar/i, reject: arabic },
+];
+
+// Run E: the camera gives the position at the start and confirms the arrival.
+const runE = [
+  { label: 'camera knows the position; visitor asks for the kitchen',
+    context: ['Camera: the robot is now at sign B.'],
+    send: 'Take me to the kitchen please.',
+    expect: /reception/i, reject: /are we at|where is the robot/i },
+  { label: 'operator gives the facing', send: 'Facing reception.',
+    expect: /turn left[\s\S]*menu boards/i, reject: arabic },
+  { label: 'camera confirms the arrival',
+    context: ['Camera: the robot is now at the kitchen marker.'],
+    send: 'Done.',
+    expect: /arrived|kitchen/i, reject: /can you confirm|confirm we/i },
+];
+
+// Run F: the camera reports a different stop than the one the step expected.
+const runF = [
+  { label: 'visitor asks for the kitchen', send: 'Take me to the kitchen please.',
+    expect: /are we at the pitch room door/i, reject: arabic },
+  { label: 'operator says yes', send: 'Yes.',
+    expect: /purple pillar/i, reject: arabic },
+  { label: 'camera says the robot is already at sign B',
+    context: ['Camera: the robot is now at sign B.'],
+    send: 'Done.',
+    expect: /turn left[\s\S]*menu boards/i, reject: /stop at the yellow pillar/i },
+];
+
 await drive('Run A: Arabic visitor to the kitchen', runA);
 await drive('Run B: return leg, unmapped change, other place', runB);
 await drive('Run C: English visitor, unmapped then kitchen, facing by landmark', runC);
+await drive('Run D: operator confirms the likely start with one word', runD);
+await drive('Run E: camera gives the position and confirms the arrival', runE);
+await drive('Run F: camera corrects the position mid-route', runF);
 
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n===== ${results.length - failed.length}/${results.length} expectations passed =====`);

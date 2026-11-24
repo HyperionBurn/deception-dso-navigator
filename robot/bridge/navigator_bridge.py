@@ -69,6 +69,7 @@ ALLOWED_ROS_NAMES = frozenset({
     '/aima/hal/audio/focus_response',
     '/aima/hal/sensor/touch_head',
     '/aima/hal/sensor/rgbd_head_front/rgb_image/compressed',
+    '/aima/hal/sensor/rgbd_head_front/rgb_camera_info',
     '/aimdk_5Fmsgs/srv/RequestAudioFocus',
     '/aimdk_5Fmsgs/srv/AbandonAudioFocus',
     '/aimdk_5Fmsgs/srv/StopAudioPlay',
@@ -208,6 +209,36 @@ MARKER_LABELS = {
     23: 'the team tables',
     24: 'the kitchen',
 }
+
+# Printed A4 marker side at 100 % scale; "at" = centred, close, and stable.
+MARKER_SIDE_M = 0.127
+AT_DISTANCE_M = 1.5
+AT_SIDE_FRACTION = 0.07
+
+
+def marker_observation(corners, width, fx=None):
+    """Geometry for one detected marker (four (x, y) corners): mean edge in
+    px, horizontal bearing, rough distance when intrinsics are known, and
+    whether the robot counts as standing at the marker."""
+    side_px = sum(
+        ((corners[i][0] - corners[(i + 1) % 4][0]) ** 2 +
+         (corners[i][1] - corners[(i + 1) % 4][1]) ** 2) ** 0.5
+        for i in range(4)) / 4
+    centre = sum(point[0] for point in corners) / 4 / width
+    bearing = 'left' if centre < 0.3 else 'right' if centre > 0.7 else 'ahead'
+    distance_m = fx * MARKER_SIDE_M / side_px if fx else None
+    at = bearing == 'ahead' and (
+        distance_m <= AT_DISTANCE_M if distance_m is not None
+        else side_px / width >= AT_SIDE_FRACTION)
+    return {'side_px': side_px, 'bearing': bearing,
+            'distance_m': distance_m, 'at': at}
+
+
+def marker_name(marker_id):
+    """How the agent should name the marker: letter signs keep the bare
+    label ('sign B'), everything else reads '<label> marker'."""
+    label = MARKER_LABELS[int(marker_id)]
+    return label if label.startswith('sign ') else f'{label} marker'
 
 
 class MarkerTracker:
@@ -555,7 +586,8 @@ class RobotIO:
     TOUCH_TOPIC = '/aima/hal/sensor/touch_head'
     # Front RGB-D camera, MJPEG — read-only, used by --camera-markers.
     CAMERA_TOPIC = '/aima/hal/sensor/rgbd_head_front/rgb_image/compressed'
-    CAMERA_MIN_INTERVAL = 0.5          # decode at most 2 fps
+    CAMERA_INFO_TOPIC = '/aima/hal/sensor/rgbd_head_front/rgb_camera_info'
+    CAMERA_MIN_INTERVAL = 0.25         # decode at most 4 fps
 
     def __init__(self, bridge, mic='vad', mic_channel=None, mic_stream=0,
                  volume=None, signals=True, touch=True, camera_markers=False):
@@ -577,6 +609,9 @@ class RobotIO:
         self._cv2 = None
         self._aruco = None
         self._markers = MarkerTracker()
+        self._at_markers = MarkerTracker(stable_frames=2, cooldown=30.0)
+        self._camera_fx = None
+        self._camera_info_width = None
         self._touch_debounce = Debouncer(TOUCH_DEBOUNCE_SECONDS)
         self._phase = None
         self._led_client = None
@@ -813,7 +848,7 @@ class RobotIO:
         try:
             import cv2
             import numpy as np
-            from sensor_msgs.msg import CompressedImage
+            from sensor_msgs.msg import CameraInfo, CompressedImage
         except ImportError as error:
             self._bridge.log(
                 f'CAMERA: markers disabled ({error}); install '
@@ -835,8 +870,23 @@ class RobotIO:
                         reliability=reliability.BEST_EFFORT)
         self._subscription(CompressedImage, self.CAMERA_TOPIC,
                            self._on_camera, qos)
+        self._subscription(CameraInfo, self.CAMERA_INFO_TOPIC,
+                           self._on_camera_info, qos)
         self._bridge.log('CAMERA: ArUco markers on RGB-D front camera '
-                         '(read-only, <=2 fps)')
+                         '(read-only, <=4 fps)')
+
+    def _on_camera_info(self, msg):
+        """First CameraInfo wins: focal length in px + its width, used to
+        scale marker distance when the decoded frame is resized."""
+        if self._camera_fx is not None:
+            return
+        try:
+            fx = float(msg.k[0])
+        except (TypeError, IndexError, AttributeError):
+            return
+        if fx > 0:
+            self._camera_fx = fx
+            self._camera_info_width = int(getattr(msg, 'width', 0)) or None
 
     def _on_camera(self, msg):
         now = time.monotonic()
@@ -853,17 +903,42 @@ class RobotIO:
         if frame is None:
             return
         if self._detector is not None:
-            _, ids, _ = self._detector.detectMarkers(frame)
+            corners, ids, _ = self._detector.detectMarkers(frame)
         else:
-            _, ids, _ = cv2.aruco.detectMarkers(frame, self._aruco_dict)
+            corners, ids, _ = cv2.aruco.detectMarkers(frame, self._aruco_dict)
         ids = [] if ids is None else [int(i) for i in ids.flatten()]
-        marker = self._markers.note(ids, now)
-        if marker is not None:
-            label = MARKER_LABELS[marker]
-            self._bridge.log(f'CAMERA: sees marker {marker} = {label}')
+        fx = self._camera_fx
+        if (fx and self._camera_info_width and
+                frame.shape[1] != self._camera_info_width):
+            fx *= frame.shape[1] / self._camera_info_width
+        obs = {}
+        for index, marker_id in enumerate(ids):
+            if marker_id in MARKER_LABELS:
+                obs[marker_id] = marker_observation(
+                    corners[index][0], frame.shape[1], fx)
+        at = self._at_markers.note(
+            [i for i in ids if obs.get(i, {}).get('at')], now)
+        seen = self._markers.note(ids, now)
+        if at is not None:
+            label = MARKER_LABELS[at]
+            distance = obs[at]['distance_m']
+            self._bridge.log(
+                f'CAMERA: at marker {at} = {label} '
+                f"({f'{distance:.2f} m' if distance is not None else 'no intrinsics'})")
             self._bridge.send_contextual(
-                f'Robot camera sees the marker for {label} '
-                f'(id {marker}).')
+                f'Camera: the robot is now at {marker_name(at)}.')
+        elif seen is not None and not obs.get(seen, {}).get('at'):
+            observation = obs[seen]
+            where = {'left': 'to the left', 'right': 'to the right'}.get(
+                observation['bearing'], 'ahead')
+            distance = observation['distance_m']
+            dist = (f', about {max(1, round(distance))} m away'
+                    if distance is not None else '')
+            self._bridge.log(
+                f'CAMERA: sees marker {seen} = {MARKER_LABELS[seen]} '
+                f'{observation["bearing"]}{dist}')
+            self._bridge.send_contextual(
+                f'Camera: {marker_name(seen)} is visible {where}{dist}.')
 
     def play(self, chunk):
         playback = self._msg['AudioPlayback']()
@@ -1347,8 +1422,6 @@ def run_preflight(args):
 
     check('python', sys.version_info >= (3, 8), sys.version.split()[0])
     modules = [('websocket', True), ('numpy', False)]
-    if getattr(args, 'camera_markers', False):
-        modules.append(('cv2', True))
     for mod, required in modules:
         try:
             __import__(mod)
@@ -1356,6 +1429,15 @@ def run_preflight(args):
         except ImportError:
             check(f'import {mod}', not required,
                   'missing' if required else 'missing (not needed by robot path)')
+    if getattr(args, 'camera_markers', False):
+        try:
+            import cv2
+            aruco_ok = hasattr(cv2, 'aruco')
+        except ImportError:
+            aruco_ok = False
+        check('import cv2 + aruco (--camera-markers)', aruco_ok,
+              '' if aruco_ok else 'python3 -m pip install --no-deps '
+              '--target ./pylib opencv-contrib-python-headless')
     ros_ok = False
     try:
         import rclpy  # noqa: F401
@@ -1445,6 +1527,48 @@ def _preflight_ros(args, check):
             check('mic stream (/agent/process_audio_output)', False,
                   'no messages in 5s — is the robot in voice-only mode? '
                   'say the wake word once')
+
+        if getattr(args, 'camera_markers', False):
+            try:
+                from sensor_msgs.msg import CameraInfo, CompressedImage
+                import cv2
+                import numpy as np
+                cam = {'frames': 0, 'size': None, 'fx': None}
+
+                def on_frame(msg):
+                    cam['frames'] += 1
+                    if cam['size'] is None:
+                        frame = cv2.imdecode(
+                            np.frombuffer(bytes(msg.data), np.uint8),
+                            cv2.IMREAD_GRAYSCALE)
+                        if frame is not None:
+                            cam['size'] = (int(frame.shape[1]),
+                                           int(frame.shape[0]))
+
+                def on_info(msg):
+                    try:
+                        fx = float(msg.k[0])
+                    except (TypeError, IndexError, AttributeError):
+                        return
+                    if fx > 0 and cam['fx'] is None:
+                        cam['fx'] = fx
+
+                node.create_subscription(CompressedImage, RobotIO.CAMERA_TOPIC,
+                                         on_frame, qos)
+                node.create_subscription(CameraInfo, RobotIO.CAMERA_INFO_TOPIC,
+                                         on_info, qos)
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    rclpy.spin_once(node, timeout_sec=0.1)
+                size = (f', decoded {cam["size"][0]}x{cam["size"][1]}'
+                        if cam['size'] else '')
+                check('camera frames in 3 s', cam['frames'] > 0,
+                      f"{cam['frames']} frames{size}")
+                check('camera intrinsics (info)', True,
+                      f"fx={cam['fx']:.1f}" if cam['fx']
+                      else 'no CameraInfo yet — distance falls back to marker size')
+            except ImportError as error:
+                check('camera frames in 3 s', False, str(error))
 
         # Focus + speaker: request focus, play back_en.pcm, release.
         focus_client = node.create_client(RequestAudioFocus, RobotIO.FOCUS_SRV)

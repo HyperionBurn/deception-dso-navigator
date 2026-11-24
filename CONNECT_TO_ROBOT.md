@@ -115,9 +115,9 @@ If the raw microphone gives nothing, use the wake-word stream instead: run `pyth
 
 ## 8. Quick test (say these, note what it answers)
 
-1. Visitor, Arabic: "أبغى أروح المطبخ". Expect an Arabic confirmation, then "Operator, we're going to the kitchen" and a question about where the robot is.
-2. Operator: "Operator here, at the pitch room door, facing reception." Expect "Operator, walk straight and stop at the purple pillar with the green speech bubble."
-3. Operator: "Done." Expect "...walk straight and stop at the peach pillar."
+1. Visitor, Arabic: "أبغى أروح المطبخ". Expect a short Arabic confirmation, then "Operator, we're going to the kitchen. Are we at the pitch room door, facing reception?"
+2. Operator: "Yes." (If the robot is somewhere else, say where it is and what it faces instead.) Expect "Operator, walk straight and stop at the purple pillar with the green speech bubble."
+3. Operator: "Done." Expect "...walk straight and stop at the yellow pillar."
 4. Operator: "Done." Expect "...turn left. Walk straight and stop at the cafeteria menu boards."
 5. Operator: "Done." Expect "Operator, stop here. Can you confirm we're at the cafeteria menu boards?"
 6. Operator: "Confirmed." Expect the arrival announcement in Arabic.
@@ -127,6 +127,10 @@ If the raw microphone gives nothing, use the wake-word stream instead: run `pyth
 Only the **team tables** and the **kitchen** (the cafeteria) have directions today. The directions were drafted from a video and nobody has walked them, so **write down any wrong turn or landmark**. The robot can stand still for this test; you only need to say the operator lines.
 
 Also note: how long it takes to answer, whether it cuts itself off, whether the volume is right, whether it hears you from 1-2 metres.
+
+## 8b. Camera
+
+Do not add `--camera-markers`: that mode only reads printed signs, and we have none. A mode that recognises the floor's own landmarks is not in this version.
 
 ## 9. Before you leave: stop and put the robot back (do not skip)
 

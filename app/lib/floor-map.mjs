@@ -15,13 +15,15 @@ export const COURSE_DESTINATIONS = Object.freeze([
 // See route-contract.md for the evidence required to add a record.
 // Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
 // Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
+// Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
+// Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
 export const FLOOR_MAP = Object.freeze({
   survey: Object.freeze({ checked_at: "2026-11-24 18:47", checked_by: "video only, not yet walked", reference: "IMG_3440.MOV" }),
   start: Object.freeze({ anchor: "sign_a", facing: "reception" }),
   anchors: Object.freeze([
-    Object.freeze({ id: "sign_a", landmark: "the pitch room door", aliases: Object.freeze(["pitch room","pitch room door","black wall","the start","steel bin","باب قاعة العروض","قاعة العروض"]) }),
-    Object.freeze({ id: "team_tables", landmark: "the purple pillar with the green speech bubble", aliases: Object.freeze(["purple pillar","magenta pillar","speech bubble","green speech bubble","team tables","the desks","طاولات الفرق","العمود البنفسجي"]) }),
-    Object.freeze({ id: "sign_b", landmark: "the peach pillar", aliases: Object.freeze(["peach pillar","pink pillar","orange pillar","العمود الوردي","العمود البرتقالي"]) }),
+    Object.freeze({ id: "sign_a", landmark: "the pitch room door", aliases: Object.freeze(["sign A","pitch room","pitch room door","black wall","the start","steel bin","باب قاعة العروض","قاعة العروض"]) }),
+    Object.freeze({ id: "team_tables", landmark: "the purple pillar with the green speech bubble", aliases: Object.freeze(["purple pillar","magenta pillar","maroon pillar","burgundy pillar","plum pillar","speech bubble","green speech bubble","yellow speech bubble","team tables","the desks","طاولات الفرق","العمود البنفسجي"]) }),
+    Object.freeze({ id: "sign_b", landmark: "the yellow pillar", aliases: Object.freeze(["sign B","yellow pillar","yellow column","yellow pillar with the glass board","العمود الأصفر"]) }),
     Object.freeze({ id: "kitchen", landmark: "the cafeteria menu boards", aliases: Object.freeze(["cafeteria","menu boards","the menu","kitchen","pizza counter","الكافتيريا","المطبخ","قائمة الطعام"]) }),
   ]),
   edges: Object.freeze([

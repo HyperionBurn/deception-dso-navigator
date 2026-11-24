@@ -56,9 +56,12 @@ inside the PC2 container this does not apply; the compressed topic is trivial.
 
 1. **"Camera confirms arrival" — doable today, no MangoBot needed.**
    `--camera-markers` subscribes the front RGB-D **compressed** topic, decodes
-   ≤2 fps with `cv2.aruco` (DICT_4X4_50), and after 3 consecutive frames sends
-   the agent a `contextual_update` ("Robot camera sees the marker for sign B
-   (id 2)"), debounced once per marker per 20 s. The printed signs in
+   ≤4 fps with `cv2.aruco` (DICT_4X4_50), and tells the agent WHERE the robot
+   is: a centred, close marker (2 stable frames) sends `Camera: the robot is
+   now at <name>.` and any other stable sighting (3 frames) sends
+   `Camera: <name> is visible <bearing>[, about N m away].` — distance comes
+   from `rgb_camera_info` intrinsics when available, marker size otherwise.
+   The printed signs in
    `robot/markers/` ARE the markers (ids 1–6 signs A–F, 11–14 booths, 21–24
    rooms). One dependency: `opencv-contrib-python-headless` + `numpy` in the
    container — `pip3 install` there (we can't pre-vendor it: any wheel we
