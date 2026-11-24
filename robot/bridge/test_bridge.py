@@ -618,9 +618,6 @@ class PreflightFormatTests(unittest.TestCase):
         self.assertEqual(nb.fmt_check('mic', False), 'FAIL  mic')
 
 
-if __name__ == '__main__':
-    unittest.main()
-
 
 class MarkerTrackerTests(unittest.TestCase):
     def test_stable_after_three_frames(self):
@@ -751,3 +748,255 @@ class CameraMarkerEventTests(unittest.TestCase):
         self.feed(self.frame_with_marker(24, 60, 150))
         self.assertEqual(self.sent,
                          ['Camera: the kitchen marker is visible to the left.'])
+
+
+class FakeFuture:
+    """Same surface as rclpy.task.Future: result() takes no timeout."""
+
+    def __init__(self):
+        self._done = False
+        self._result = None
+        self._callbacks = []
+        self._lock = threading.Lock()
+
+    def done(self):
+        return self._done
+
+    def result(self):
+        return self._result
+
+    def add_done_callback(self, callback):
+        with self._lock:
+            if not self._done:
+                self._callbacks.append(callback)
+                return
+        callback(self)
+
+    def set_result(self, value):
+        with self._lock:
+            self._result, self._done = value, True
+            callbacks, self._callbacks = self._callbacks, []
+        for callback in callbacks:
+            callback(self)
+
+
+class FakeClient:
+    """A ROS service client whose executor answers after `delay` seconds."""
+
+    def __init__(self, response, ready_after=0, delay=0.01, answer=True):
+        self.response = response
+        self.ready_after = ready_after
+        self.delay = delay
+        self.answer = answer
+        self.waits = 0
+        self.requests = []
+
+    def wait_for_service(self, timeout_sec=None):
+        self.waits += 1
+        return self.waits > self.ready_after
+
+    def call_async(self, request):
+        self.requests.append(request)
+        future = FakeFuture()
+        if self.answer:
+            threading.Timer(self.delay, future.set_result, (self.response,)).start()
+        return future
+
+
+class ServiceCallTests(unittest.TestCase):
+    """Focus, stop, volume, LED and emoji all go through RobotIO._call."""
+
+    def test_fake_future_matches_rclpy(self):
+        with self.assertRaises(TypeError):
+            FakeFuture().result(timeout=0.25)   # what the old _call did
+
+    def test_returns_response_from_executor(self):
+        io = nb.RobotIO(FakeBridge())
+        response = object()
+        client = FakeClient(response)
+        self.assertIs(io._call(client, 'req'), response)
+        self.assertEqual(client.requests, ['req'])
+
+    def test_waits_for_service_then_retries(self):
+        io = nb.RobotIO(FakeBridge())
+        response = object()
+        client = FakeClient(response, ready_after=3)
+        self.assertIs(io._call(client, 'req', timeout=0.01), response)
+        self.assertEqual(len(client.requests), 1)
+
+    def test_gives_up_when_never_answered(self):
+        io = nb.RobotIO(FakeBridge())
+        client = FakeClient(object(), answer=False)
+        started = time.monotonic()
+        self.assertIsNone(io._call(client, 'req', tries=2, timeout=0.02))
+        self.assertEqual(len(client.requests), 2)
+        self.assertLess(time.monotonic() - started, 1.0)
+
+    def test_gives_up_when_service_missing(self):
+        io = nb.RobotIO(FakeBridge())
+        client = FakeClient(object(), ready_after=99)
+        self.assertIsNone(io._call(client, 'req', tries=3, timeout=0.01))
+        self.assertEqual(client.requests, [])
+
+    def test_focus_is_granted(self):
+        bridge = FakeBridge()
+        io = nb.RobotIO(bridge)
+        granted = types.SimpleNamespace(
+            focus_response=types.SimpleNamespace(focus_gain=True))
+        io._focus_client = FakeClient(granted)
+        io._srv = {'focus': types.SimpleNamespace(Request=types.SimpleNamespace)}
+        fake_msgs = types.ModuleType('aimdk_msgs.msg')
+        fake_msgs.FocusRequester = types.SimpleNamespace
+        with mock.patch.dict(sys.modules, {'aimdk_msgs': types.ModuleType('aimdk_msgs'),
+                                           'aimdk_msgs.msg': fake_msgs}):
+            io._request_focus()
+        self.assertTrue(io._focus)
+        request = io._focus_client.requests[0]
+        self.assertEqual(request.focus_requester.pkg_name, io._pkg)
+        self.assertEqual(request.focus_requester.priority, nb.FOCUS_PRIORITY)
+        self.assertIn('FOCUS: request -> focus_gain=True', bridge.logs)
+
+    def test_stop_playback_reaches_service(self):
+        io = nb.RobotIO(FakeBridge())
+        io._srv = {'stop': types.SimpleNamespace(Request=object)}
+        io._stop_client = FakeClient(object())
+        io.stop_playback()
+        self.assertEqual(len(io._stop_client.requests), 1)
+
+
+class FakePlayback:
+    def __init__(self):
+        self.pkg_name = ''
+        self.token_id = ''
+        self.info = types.SimpleNamespace()
+        self.data = types.SimpleNamespace()
+
+
+def robot_bridge(**over):
+    """A real Bridge wired to a real RobotIO whose publisher records messages."""
+    bridge = make_bridge(io_backend=nb.RobotIO, **over)
+    published = []
+    bridge.io._msg = {'AudioPlayback': FakePlayback}
+    bridge.io._pub = types.SimpleNamespace(publish=published.append)
+    return bridge, published
+
+
+def spoken_chunks(ws):
+    chunks = [base64.b64decode(m['user_audio_chunk']) for m in ws.sent
+              if 'user_audio_chunk' in m]
+    return [c for c in chunks if c != nb.SILENCE]
+
+
+class MicPathTests(unittest.TestCase):
+    """Robot mic message -> RobotIO -> Bridge -> user_audio_chunk on the socket."""
+
+    def run_sender(self, bridge, seconds):
+        thread = threading.Thread(target=bridge._mic_sender, daemon=True)
+        thread.start()
+        time.sleep(seconds)
+        bridge.stop_event.set()
+        thread.join(1)
+
+    def raw_msg(self, frames, with_info=True, rate=16000):
+        msg = types.SimpleNamespace(
+            mic_channels=2, ref_channels=1,
+            data=types.SimpleNamespace(data=interleaved(frames)))
+        if with_info:
+            msg.info = types.SimpleNamespace(channels=3, sample_rate=rate)
+        return msg
+
+    def test_raw_capture_reaches_socket_as_mono_16k(self):
+        for with_info in (True, False):
+            bridge, _ = robot_bridge(half_duplex=False)
+            bridge.negotiated.set()
+            frames = [(1000, 3000, 9999)] * 1600      # 0.1 s; the ref channel is dropped
+            bridge.io._on_raw_audio(self.raw_msg(frames, with_info))
+            self.run_sender(bridge, 0.25)
+            self.assertEqual(spoken_chunks(bridge.ws), [pcm([2000] * 1600)], with_info)
+
+    def test_raw_capture_at_48k_is_resampled(self):
+        bridge, _ = robot_bridge(half_duplex=False)
+        bridge.negotiated.set()
+        bridge.io._on_raw_audio(self.raw_msg([(500, 500, 0)] * 4800, rate=48000))
+        self.run_sender(bridge, 0.25)
+        chunks = spoken_chunks(bridge.ws)
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(len(chunks[0]), nb.CHUNK_BYTES)
+
+    def test_vad_stream_reaches_socket_unchanged(self):
+        bridge, _ = robot_bridge(half_duplex=False)
+        bridge.negotiated.set()
+        audio = bytes(range(200)) * 16                # 3200 B
+        bridge.io._on_vad_audio(types.SimpleNamespace(stream_id=1, audio_data=audio))
+        self.run_sender(bridge, 0.25)
+        self.assertEqual(spoken_chunks(bridge.ws), [audio])
+
+    def test_half_duplex_sends_silence_while_robot_speaks(self):
+        bridge, _ = robot_bridge(half_duplex=True)
+        bridge.negotiated.set()
+        bridge.clock.note(nb.RATE * 2 * 2)            # 2 s of speech queued
+        bridge.io._on_vad_audio(types.SimpleNamespace(stream_id=1, audio_data=b'\x07' * 3200))
+        self.run_sender(bridge, 0.25)
+        self.assertEqual(spoken_chunks(bridge.ws), [])
+        self.assertTrue(any('user_audio_chunk' in m for m in bridge.ws.sent))
+
+    def test_nothing_sent_before_negotiation(self):
+        bridge, _ = robot_bridge(half_duplex=False)
+        bridge.io._on_vad_audio(types.SimpleNamespace(stream_id=1, audio_data=b'\x07' * 3200))
+        self.run_sender(bridge, 0.25)
+        self.assertEqual(bridge.ws.sent, [])
+
+
+class PlaybackPathTests(unittest.TestCase):
+    """Agent audio event -> Bridge -> RobotIO.play -> AudioPlayback messages."""
+
+    def start(self):
+        bridge, published = robot_bridge()
+        bridge.on_event(METADATA)
+        threading.Thread(target=bridge._playback_worker, daemon=True).start()
+        self.addCleanup(bridge.stop_event.set)
+        return bridge, published
+
+    def wait_for(self, published, nbytes, limit=3.0):
+        started = time.monotonic()
+        while (sum(len(m.data.data) for m in published) < nbytes
+               and time.monotonic() - started < limit):
+            time.sleep(0.01)
+        return time.monotonic() - started
+
+    def test_agent_audio_published_as_16k_mono_in_order(self):
+        bridge, published = self.start()
+        audio = bytes(range(256)) * 125               # 1.0 s
+        half = len(audio) // 2
+        for part in (audio[:half], audio[half:]):
+            bridge.on_event({'type': 'audio', 'audio_event': {
+                'audio_base_64': base64.b64encode(part).decode()}})
+        elapsed = self.wait_for(published, len(audio))
+        self.assertEqual(b''.join(bytes(m.data.data) for m in published), audio)
+        self.assertTrue(all(len(m.data.data) == nb.PUBLISH_BYTES for m in published))
+        for m in published:
+            self.assertEqual((m.info.channels, m.info.sample_rate), (1, 16000))
+            self.assertEqual(m.pkg_name, bridge.io._pkg)
+            self.assertEqual(m.token_id, f'{bridge.io._pkg}-0')
+        self.assertGreater(elapsed, 0.5)               # real-time pace, not a burst
+        self.assertLess(elapsed, 1.1)
+
+    def test_interruption_starts_a_new_token(self):
+        bridge, published = self.start()
+        speech = base64.b64encode(b'\x01\x00' * 32000).decode()   # 2 s
+        bridge.on_event({'type': 'audio', 'audio_event': {'audio_base_64': speech}})
+        time.sleep(0.2)
+        bridge.on_event({'type': 'interruption'})
+        before = len(published)
+        self.assertGreater(before, 0)
+        time.sleep(0.3)
+        self.assertEqual(len(published), before, 'nothing more of the old answer')
+        bridge.on_event({'type': 'audio', 'audio_event': {
+            'audio_base_64': base64.b64encode(b'\x02\x00' * 1600).decode()}})
+        self.wait_for(published, sum(len(m.data.data) for m in published) + 3200)
+        self.assertEqual(published[-1].token_id, f'{bridge.io._pkg}-1')
+        self.assertTrue(all(m.token_id.endswith('-0') for m in published[:before]))
+
+
+if __name__ == '__main__':
+    unittest.main()
