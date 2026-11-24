@@ -65,7 +65,9 @@ const roleLabels = new Map([
   ['secondVisitor', 'SECOND VISITOR'],
   ['agent', 'NAVIGATOR'],
   ['instruction', 'NAVIGATOR → OPERATOR'],
+  ['navigatorOperator', 'NAVIGATOR → OPERATOR · EN'],
   ['operator', 'OPERATOR'],
+  ['tool', 'ROUTE TOOL'],
   ['context', 'SIMULATION NOTE'],
 ]);
 
@@ -75,6 +77,7 @@ const phases = {
   listening: 'Listening · speak now',
   speaking: 'Navigator speaking',
   queued: 'Audio queued',
+  reconnecting: 'Connection lost — reconnecting',
   idle: 'Microphone off',
   error: 'Live voice interrupted',
 };
@@ -85,6 +88,7 @@ const arabicLetter = /(?=\p{Script=Arabic})\p{Letter}/u;
 let mode = 'practice';
 let practiceStep = 0;
 let VoiceSession;
+let agentDisplay;
 let session = null;
 
 function report(phase, label, detail = '') {
@@ -134,6 +138,22 @@ function clearMessages() {
 }
 
 function addMessage({ role, text } = {}) {
+  if (role === 'divider') {
+    if (typeof text !== 'string' || !text.trim()) return;
+    const divider = document.createElement('li');
+    divider.className = 'divider';
+    divider.textContent = text.trim().slice(0, 200);
+    el('transcript-empty').hidden = true;
+    el('messages').append(divider);
+    el('transcript').scrollTop = el('transcript').scrollHeight;
+    return;
+  }
+  if (role === 'agent' && agentDisplay) {
+    const display = agentDisplay(text);
+    if (!display) return;
+    text = display.text;
+    if (display.operator) role = 'navigatorOperator';
+  }
   const roleText = roleLabels.get(role);
   if (!roleText || typeof text !== 'string' || !text.trim()) return;
   const transcript = el('transcript');
@@ -143,6 +163,7 @@ function addMessage({ role, text } = {}) {
   const body = document.createElement('p');
   item.className = 'message';
   if (role === 'user' || role === 'secondVisitor') item.classList.add('visitor');
+  else if (role === 'navigatorOperator') item.classList.add('navigator-operator');
   else if (role !== 'agent') item.classList.add(role);
   roleLabel.className = 'role';
   roleLabel.textContent = mode === 'live' && role === 'user' ? 'MICROPHONE' : roleText;
@@ -218,7 +239,7 @@ async function enableLiveWhenReady() {
       signal: AbortSignal.timeout(4500),
     });
     if (!response.ok || (await response.json())?.live_ready !== true) throw new Error();
-    ({ VoiceSession } = await import('./voice.mjs'));
+    ({ VoiceSession, agentDisplay } = await import('./voice.mjs'));
     if (typeof VoiceSession !== 'function') throw new Error();
     el('mode-switch').hidden = false;
   } catch {
@@ -259,6 +280,10 @@ el('live-stop').addEventListener('click', () => {
 el('live-controls').addEventListener('submit', async event => {
   event.preventDefault();
   if (mode !== 'live' || !VoiceSession || session || !el('access-code').value) return;
+  if (navigator.onLine === false) {
+    report('error', phases.error, 'No internet connection — check Wi-Fi and try again.');
+    return;
+  }
   clearMessages();
   const current = new VoiceSession({
     onState: state => handleState(current, state),

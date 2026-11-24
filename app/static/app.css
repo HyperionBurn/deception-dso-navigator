@@ -80,7 +80,9 @@ select, input { width: 100%; min-height: 44px; border: 1px solid #61776a; border
 .session-status { display: flex; align-items: center; gap: 8px; font-size: .83rem; font-weight: 700; }
 .dot { flex: 0 0 8px; width: 8px; height: 8px; border: 1px solid #99b6a1; border-radius: 50%; }
 [data-phase="listening"] .dot, [data-phase="speaking"] .dot { background: var(--accent); border-color: var(--accent); }
+[data-phase="reconnecting"] .dot { background: var(--sand); border-color: var(--sand); animation: pulse 1.2s ease-in-out infinite; }
 [data-phase="error"] .dot { background: #ffb090; border-color: #ffb090; }
+@keyframes pulse { 50% { opacity: .3; } }
 .badge { color: var(--accent); border: 1px solid #637856; border-radius: 4px; padding: 4px 6px; font-size: .61rem; font-weight: 730; white-space: nowrap; }
 .devices { display: flex; flex-wrap: wrap; gap: 6px 15px; border-bottom: 1px solid var(--line); padding: 8px clamp(15px, 3vw, 25px); color: var(--muted); font: .72rem var(--mono); }
 .detail { padding: 9px clamp(15px, 3vw, 25px); color: #f7d6ae; font-size: .86rem; overflow-wrap: anywhere; }
@@ -95,9 +97,15 @@ select, input { width: 100%; min-height: 44px; border: 1px solid #61776a; border
 .message.visitor { justify-self: end; border-color: #5e5740; background: #333525; }
 .message .role { display: block; margin-bottom: 3px; color: var(--accent); font: 700 .68rem var(--mono); }
 .message.visitor .role { color: #f0d6a3; }
-.message.instruction { border-color: #738451; border-inline-start: 3px solid var(--accent); }
+.message.instruction, .message.navigator-operator { border-color: #738451; border-inline-start: 3px solid var(--accent); }
+.message.navigator-operator .role { color: var(--sand); }
 .message.operator { justify-self: end; border-color: #547175; background: #21373a; }
 .message.operator .role { color: #bbe1df; }
+.message.tool { justify-self: center; border-style: dashed; border-color: #4a6455; background: transparent; padding-block: 5px 6px; }
+.message.tool .role { color: #9fb8a4; font-size: .6rem; margin-bottom: 2px; }
+.message.tool p { font: .8rem var(--mono); color: var(--muted); }
+.divider { display: flex; align-items: center; gap: 10px; margin-block: 2px; color: var(--sand); font: .66rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .message.context { justify-self: center; border-style: dashed; background: transparent; color: var(--muted); text-align: center; }
 .message.context .role { color: var(--sand); }
 .message.context p { font-size: .82rem; }
