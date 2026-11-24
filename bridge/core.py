@@ -131,7 +131,7 @@ class AudioSink:
         """Throw away everything queued and stop now. May block (the core calls it in a thread)."""
         raise NotImplementedError
 
-    def close(self) -> None:
+    async def close(self) -> None:
         pass
 
 
@@ -430,7 +430,9 @@ class SessionCore:
         except Exception as exc:
             log.warning("could not close the mic: %s", exc)
         try:
-            self.sink.close()
+            result = self.sink.close()
+            if inspect.isawaitable(result):
+                await result
         except Exception as exc:
             log.warning("could not close the speaker: %s", exc)
 
