@@ -52,6 +52,13 @@ const SIGHTING = new RegExp(
   '\\b(?:far|ahead|behind|over there|from here|in the distance)\\b' +
   '|(?<![\\p{L}])(?:بعيد|بعيده|بعيدة|خلفي|ورا|وراي)(?![\\p{L}])', 'iu');
 
+// "On my left" or "to the right" says where a place is, not that the operator is at it.
+const SIDE = /\b(?:on|to) (?:my |the )?(?:left|right)\b|\b(?:left|right) of me\b|\bbeside me\b/iu;
+// Seeing the destination is not arriving. Seeing a waypoint is still fine (same question as above).
+const SEEING = /\b(?:see|sees|seeing|seen|saw|spot|spotted|visible)\b/iu;
+// Words that start a facing inside a position: "sign B, facing the pitch room".
+const FACING_WORDS = /\b(?:facing|toward|towards|looking|look)\b/iu;
+
 export const tokenize = value => {
   const text = value.normalize('NFC')
     .replace(/(^|[^\p{L}\p{N}])[Ss][Ii][Gg][Nn]\s+([A-F])(?![\p{L}\p{N}])/gu, '$1sign$2')
@@ -131,6 +138,28 @@ function canonicalFacing(map, anchors, observed) {
     return keyTokens.size === observed.size && isSubset(keyTokens, observed);
   });
   return exact.length === 1 ? exact[0].key : null;
+}
+
+// Other facing labels on the map that name the same place as this one, for example
+// "the purple pillar" (anchor landmark) and "team tables" (a facing used by the edges).
+function sameFacings(map, anchors, canonical) {
+  const same = (a, b) => a.size === b.size && isSubset(a, b);
+  const wanted = tokenize(canonical);
+  const labels = new Set();
+  for (const edge of map.edges ?? []) {
+    for (const pose of [edge?.entry_pose, edge?.exit_pose]) {
+      if (pose?.facing != null && validFacing(pose.facing)) labels.add(pose.facing);
+    }
+  }
+  const found = new Set();
+  for (const anchor of anchors.values()) {
+    const phrases = anchorPhrases(anchor);
+    if (!phrases.some(phrase => same(phrase, wanted))) continue;
+    for (const label of labels) {
+      if (label !== canonical && phrases.some(phrase => same(phrase, tokenize(label)))) found.add(label);
+    }
+  }
+  return [...found];
 }
 
 function checkedAnchors(records, survey) {
@@ -223,18 +252,26 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
   };
 
   let currentId = current_id;
+  let embeddedFacing = null;
   if (current_landmark != null) {
     if (currentId != null || !validObservedLandmark(current_landmark)) return anchorRequired();
-    // A place described as far, ahead or behind is not where the operator stands. Ask where they stand.
-    if (SIGHTING.test(current_landmark)) return anchorRequired();
+    // "Sign B, facing the pitch room": only the words before "facing" say where the operator stands.
+    const cut = current_landmark.search(FACING_WORDS);
+    const placeText = cut < 0 ? current_landmark : current_landmark.slice(0, cut);
+    if (cut >= 0) embeddedFacing = current_landmark.slice(cut).trim();
+    // A place described as far, ahead, behind or on one side is not where the operator stands. Ask where they stand.
+    if (SIGHTING.test(placeText) || SIDE.test(placeText)) return anchorRequired();
     const match = matchPhrases(
       [...anchors.values()].map(anchor => ({
         key: anchor.id, anchor, phrases: anchorPhrases(anchor),
       })),
-      tokenize(current_landmark),
+      tokenize(placeText),
     );
-    if (match.winner) currentId = match.winner.key;
-    else if (match.tied.length > 1) {
+    if (match.winner) {
+      currentId = match.winner.key;
+      // Seeing the destination is not arriving at it. Ask where they stand.
+      if (currentId === destination_id && SEEING.test(placeText)) return anchorRequired();
+    } else if (match.tied.length > 1) {
       return {
         status: 'needs_anchor',
         reason: 'ambiguous_landmark',
@@ -254,21 +291,25 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
 
   const outgoing = checkedEdges(map.edges, anchors, map.survey);
   let pose = '';
+  let canonical = null;
+  const poseFor = label => {
+    const direct = `facing:${label}`;
+    const here = outgoing.get(currentId) ?? [];
+    const implied = new Set(here
+      .filter(edge => edge.action === 'walk_straight' && edge.entry_pose &&
+        anchors.get(edge.to).landmark === label)
+      .map(edge => poseKey(edge.entry_pose)));
+    return here.some(edge => poseKey(edge.entry_pose) === direct) || implied.size !== 1
+      ? direct : [...implied][0];
+  };
+  // A facing sent on its own wins over one said inside the position text.
+  const facingText = facing ?? (heading == null ? embeddedFacing : null);
   if (!(heading != null && facing != null)) {
     if (heading != null && validPose({ heading })) {
       pose = poseKey({ heading });
-    } else if (facing != null && validPose({ facing })) {
-      const canonical = canonicalFacing(map, anchors, tokenize(facing));
-      if (canonical != null) {
-        const direct = `facing:${canonical}`;
-        const here = outgoing.get(currentId) ?? [];
-        const implied = new Set(here
-          .filter(edge => edge.action === 'walk_straight' && edge.entry_pose &&
-            anchors.get(edge.to).landmark === canonical)
-          .map(edge => poseKey(edge.entry_pose)));
-        pose = here.some(edge => poseKey(edge.entry_pose) === direct) || implied.size !== 1
-          ? direct : [...implied][0];
-      }
+    } else if (facingText != null && validPose({ facing: facingText })) {
+      canonical = canonicalFacing(map, anchors, tokenize(facingText));
+      if (canonical != null) pose = poseFor(canonical);
     }
   }
 
@@ -280,7 +321,16 @@ function fullPlan(map, { destination_id, current_id, current_landmark, heading, 
     landmark: anchors.get(edge.to).landmark,
   }));
 
-  const path = shortestRoute(outgoing, currentId, pose, destination_id);
+  let path = shortestRoute(outgoing, currentId, pose, destination_id);
+  if (!path && canonical != null) {
+    // Another name for the same place ("the purple pillar" = "team tables"). Use it only when exactly one has a route.
+    const routable = [...new Set(sameFacings(map, anchors, canonical).map(poseFor))]
+      .filter(candidate => shortestRoute(outgoing, currentId, candidate, destination_id));
+    if (routable.length === 1) {
+      pose = routable[0];
+      path = shortestRoute(outgoing, currentId, pose, destination_id);
+    }
+  }
   if (!path) {
     const usable = new Set();
     for (const edge of outgoing.get(currentId) ?? []) {
