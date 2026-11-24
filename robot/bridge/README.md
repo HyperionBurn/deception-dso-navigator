@@ -109,8 +109,8 @@ confused, sad, sleeping). Both services are called with priority 6 and
 the head touch sensor (`/aima/hal/sensor/touch_head`, 2 s debounce) starts a
 fresh take, same as `Enter`. Everything is best-effort and never blocks audio;
 `--no-signals` / `--no-touch` disable. If the LED strip seems stuck, another
-source may hold a higher priority — see troubleshooting; per the docs you can
-stop `task_manager` on PC1 (`aima em stop-app task_manager`) to keep the strip.
+source may hold a higher priority — see troubleshooting. Do not stop anything
+on PC1 yourself (organiser rule); ask the MangoBot engineer if the strip must stay ours.
 
 ## `--mic vad` caveat
 
