@@ -57,7 +57,7 @@ const SIDE = /\b(?:on|to) (?:my |the )?(?:left|right)\b|\b(?:left|right) of me\b
 // Seeing the destination is not arriving. Seeing a waypoint is still fine (same question as above).
 const SEEING = /\b(?:see|sees|seeing|seen|saw|spot|spotted|visible)\b|(?<!\p{L})(?:اشوف|أشوف|شايف|شايفه|شايفة)(?!\p{L})/iu;
 // Words that start a facing inside a position: "sign B, facing the pitch room".
-const FACING_WORDS = /\b(?:facing|toward|towards|looking|look)\b|(?<!\p{L})و?(?:مواجه|مواجهة|مواجهه|باتجاه|متجه|وجهي)(?!\p{L})/iu;
+const FACING_WORDS = /\b(?:facing|toward|towards|looking|look)\b|(?<!\p{L})و?(?:مواجه|مواجهة|مواجهه|باتجاه|متجه)(?!\p{L})/iu;
 
 export const tokenize = value => {
   const text = value.normalize('NFC')

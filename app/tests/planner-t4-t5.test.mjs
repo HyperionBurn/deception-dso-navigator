@@ -67,3 +67,11 @@ test('T3 in Arabic: the cafeteria on one side or only in view is not an arrival'
     assert.equal(plan({ current_landmark: text }).status, 'at_destination', text);
   }
 });
+
+test('Arabic: "in front of my face ... far" is a sighting, not a position with a facing', () => {
+  for (const text of ['العمود الأصفر قدام وجهي بعيد', 'الكافتيريا قدام وجهي بعيدة']) {
+    const result = plan({ current_landmark: text });
+    assert.equal(result.status, 'needs_anchor', text);
+    assert.equal(result.reason, 'current_anchor_required', text);
+  }
+});
