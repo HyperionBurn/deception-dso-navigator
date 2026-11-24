@@ -53,7 +53,7 @@ Say the robot's wake word once (MangoBot says which), then talk normally.
 | It interrupts itself | Restart with `--half-duplex` (mic mutes while the robot speaks) |
 | Speaker stays silent | Agent output must be `pcm_16000`; check `FOCUS: … focus_gain=false` in the log — ask MangoBot to check the agent module |
 | No connection | No internet in the container — tell the engineer; or `--session direct` with `ELEVENLABS_API_KEY` |
-| Loud room | Ask the engineer for the external mic, then `--mic-stream 2` |
+| Loud room | Ask the engineer for the external mic and which stream_id it uses (docs: 1 = external), then `--mic-stream <id>` |
 | Repeats leg-1 instruction | Site route tool down — check `SESSION:`/`PROTOCOL:` log lines |
 
 ## The four questions for MangoBot
