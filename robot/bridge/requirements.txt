@@ -1,0 +1,5 @@
+# Robot container needs only websocket-client (rclpy is preinstalled there).
+websocket-client>=1.8.0
+# Laptop mode only (--io laptop); skip these inside the robot container.
+sounddevice>=0.5.0
+numpy>=1.26
