@@ -936,6 +936,8 @@ class Bridge:
         self._mic_lock = threading.Lock()
         self.send_q = queue.Queue(maxsize=MIC_QUEUE_CHUNKS)
         self.play_q = queue.Queue()
+        self._pending = bytearray()
+        self._play_lock = threading.Lock()
         self.transcripts = collections.deque(maxlen=TRANSCRIPT_LINES)
 
         self.ws = None
@@ -1035,49 +1037,41 @@ class Bridge:
     # -- playback path -------------------------------------------------------
 
     def _playback_worker(self):
-        pending = bytearray()
         while not self.stop_event.is_set():
-            try:
-                pending.extend(self.play_q.get(timeout=0.1))
-            except queue.Empty:
-                pass
-            while True:
-                try:
-                    pending.extend(self.play_q.get_nowait())
-                except queue.Empty:
-                    break
-            # Pace device writes: never run more than LOOKAHEAD ahead.
-            while (self.clock.remaining() > PLAYBACK_LOOKAHEAD
-                   and not self.stop_event.is_set()):
-                try:
-                    pending.extend(self.play_q.get(timeout=0.1))
-                except queue.Empty:
-                    pass
-            if self.stop_event.is_set():
-                break
-            if len(pending) >= PUBLISH_BYTES or (pending and self.play_q.empty()):
-                chunk = bytes(pending[:PUBLISH_BYTES])
-                del pending[:PUBLISH_BYTES]
-                self.clock.note(len(chunk))
-                if self.io:
+            with self._play_lock:
+                while True:
                     try:
-                        self.io.play(chunk)
-                        self.latency.note_played()
-                    except Exception as error:
-                        self.log(f'PLAYBACK: io error: {error}')
+                        self._pending.extend(self.play_q.get_nowait())
+                    except queue.Empty:
+                        break
+                # Pace device writes: never run more than LOOKAHEAD ahead.
+                while (self._pending
+                       and self.clock.remaining() <= PLAYBACK_LOOKAHEAD):
+                    chunk = bytes(self._pending[:PUBLISH_BYTES])
+                    del self._pending[:PUBLISH_BYTES]
+                    self.clock.note(len(chunk))
+                    if self.io:
+                        try:
+                            self.io.play(chunk)
+                            self.latency.note_played()
+                        except Exception as error:
+                            self.log(f'PLAYBACK: io error: {error}')
+            self.stop_event.wait(0.01)
 
     def clear_playback(self):
-        while True:
-            try:
-                self.play_q.get_nowait()
-            except queue.Empty:
-                break
-        self.clock.clear()
-        if self.io:
-            try:
-                self.io.stop_playback()
-            except Exception:
-                pass
+        with self._play_lock:
+            while True:
+                try:
+                    self.play_q.get_nowait()
+                except queue.Empty:
+                    break
+            self._pending.clear()
+            self.clock.clear()
+            if self.io:
+                try:
+                    self.io.stop_playback()
+                except Exception:
+                    pass
 
     # -- websocket ------------------------------------------------------------
 
