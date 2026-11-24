@@ -121,7 +121,8 @@ test('a stale or repeated step id never moves the plan twice', () => {
   const second = s.call('confirm_step', { step_id: first.step_id, result: 'stopped' });
   const again = s.call('confirm_step', { step_id: first.step_id, result: 'stopped' });
   assert.equal(again.status, 'stale');
-  assert.equal(again.say_operator, second.say_operator);
+  assert.equal(again.say_operator, null, 'the operator already heard the next instruction');
+  assert.ok(second.say_operator);
   assert.equal(s.state.i, 1);
 });
 

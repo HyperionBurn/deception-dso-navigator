@@ -24,6 +24,8 @@ export function sweepMap(map) {
           let step = call('plan_route', { destination_id: dest, lang: 'en' });
           for (let guard = 0; guard < 40 && !step.arrived && step.status !== 'handover'; guard++) {
             if (!['instruction', 'arrival_check'].includes(step.status)) break;
+            // The route must really end at the place before the operator is asked to confirm it.
+            if (step.status === 'arrival_check' && state.pos?.node !== dest) break;
             step = call('confirm_step', { step_id: step.step_id, result: step.status === 'arrival_check' ? 'yes' : 'done' });
           }
           if (!step.arrived || state.pos?.node !== dest) failures.push(label);

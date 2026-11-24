@@ -5,6 +5,8 @@ import { HEADINGS, isHeading, opposite } from './headings.mjs';
 // Until someone measures the floor, the only map we have is demo data (meta.demo = true).
 
 export const MAX_CUE_WORDS = 9; // "walk straight until" + cue must stay within 12 words
+export const MAX_SEE_WORDS = 6; // "stay stopped. Do you see" + see must stay within 12 words
+export const MAX_SAY_WORDS = 12; // everything after "Operator,"
 const ID = /^[a-z][a-z0-9_]{0,31}$/u;
 const COMPASS = /\b(north|south|east|west|northern|southern|eastern|western)\b/iu;
 
@@ -52,7 +54,13 @@ export function validateMap(map) {
     }
     if (node.type === 'place' && !(typeof node.see === 'string' && node.see.trim())) {
       fail(`place ${id} needs "see" (a short phrase for the arrival check, like "the door of booth one")`);
+    } else if (node.type === 'place') {
+      // Heard as "Operator, stay stopped. Do you see <see>?" so it must stay inside 12 words after "Operator,".
+      if (wordCount(node.see) > MAX_SEE_WORDS) fail(`place ${id} "see" is too long (max ${MAX_SEE_WORDS} words)`);
+      if (COMPASS.test(node.see)) fail(`place ${id} "see" has a compass word; the operator never hears compass words`);
     }
+    // Used when a corridor ends here and the node has no cue for the walking direction.
+    if (wordCount(`you reach ${node.name}`) > MAX_CUE_WORDS) fail(`node ${id} name is too long to be spoken as a cue`);
     if (node.aliases != null && !(Array.isArray(node.aliases) && node.aliases.every(a => typeof a === 'string'))) {
       fail(`node ${id} aliases must be a list of strings`);
     }
@@ -82,6 +90,11 @@ export function validateMap(map) {
   if (meta.start) {
     if (!nodes[meta.start.node] || !isHeading(meta.start.heading) || typeof meta.start.say !== 'string') {
       fail('meta.start needs node, heading and say');
+    } else {
+      const say = meta.start.say;
+      if (!/^Operator, /u.test(say)) fail('meta.start.say must begin with "Operator, "');
+      if (COMPASS.test(say)) fail('meta.start.say has a compass word; the operator never hears compass words');
+      if (wordCount(say.replace(/^Operator,\s*/u, '')) > MAX_SAY_WORDS) fail(`meta.start.say is too long (max ${MAX_SAY_WORDS} words after "Operator,")`);
     }
   }
 

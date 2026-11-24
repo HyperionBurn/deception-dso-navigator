@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createStore } from '../lib/nav/store.mjs';
 import { loadMap, mapReady } from '../lib/nav/maps.mjs';
-import { TOOL_NAMES, runTool } from '../lib/nav/tools.mjs';
+import { HANDOVER_SAY, TOOL_NAMES, runTool, writesState } from '../lib/nav/tools.mjs';
 
 // Webhook tools for the voice agent. POST /api/nav?tool=<name> with a flat JSON body: { session_id, ...args }.
 // Same secret header as /api/route (NAVIGATOR_ROUTE_TOOL_KEY). Position and route state is kept per session_id.
@@ -97,15 +97,21 @@ export default {
     }
 
     const { session_id: sessionId, ...args } = body;
-    const store = createStore(process.env);
     try {
+      const store = createStore(process.env);
       const now = Date.now();
       const before = await store.get(sessionId, now);
       const { state, result } = runTool({ map, state: before, session_id: sessionId, tool, args, now });
-      await store.set(sessionId, state, now);
+      if (writesState(tool, result)) await store.set(sessionId, state, now);
       return json(result, 200, { 'X-Nav-Store': store.kind });
-    } catch {
-      return json({ error: 'Navigation tool failed.' }, 503);
+    } catch (error) {
+      console.error('nav tool failed:', tool, error?.name, error?.message);
+      // Never leave the operator without an instruction: tell them to stay put and ask for a person.
+      return json({
+        ok: false, status: 'handover', say_operator: HANDOVER_SAY,
+        tell_visitor_en: 'I am not sure where we are. Please wait. I am calling a person to help.',
+        message: 'The navigation service had a problem. Do not guess directions.',
+      });
     }
   },
 };

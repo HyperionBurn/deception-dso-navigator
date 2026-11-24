@@ -8,9 +8,9 @@ import { TURN_PENALTY, legsCost, legsToInstructions, planLegs } from './planner.
 const SESSION_ID = /^[A-Za-z0-9_-]{8,64}$/u;
 export const HOLD_SAY = 'Operator, stop. Stay where you are.';
 const SEE_SAY = 'Operator, what do you see?';
-const HANDOVER_SAY = 'Operator, stay where you are. I am calling a person.';
+export const HANDOVER_SAY = 'Operator, stay where you are. I am calling a person.';
 export const REPLIES = Object.freeze(['ok', 'ready', 'done', 'stopped', 'yes', 'no', 'free', 'busy', 'repeat', 'lost', 'blocked', 'wait', 'see', 'at']);
-const REPLY_SYNONYMS = { okay: 'ok', yeah: 'yes', yep: 'yes', nope: 'no', stop: 'stopped', finished: 'done', complete: 'done' };
+const REPLY_SYNONYMS = { okay: 'ok', yeah: 'yes', yep: 'yes', nope: 'no', stop: 'wait', finished: 'done', complete: 'done' };
 const LOG_LIMIT = 40;
 const MAX_MISSES = 2;
 
@@ -229,6 +229,7 @@ function findNode(map, thing) {
 }
 
 function afterFix(map, state, now) {
+  state.handover = null;
   state.misses = 0;
   state.pending_landmark = null;
   state.hold_unsure = false;
@@ -237,11 +238,12 @@ function afterFix(map, state, now) {
   return beginRoute(map, state, dest, now);
 }
 
-function reportLandmark(map, state, now, { thing, side }) {
+// `standingAt` is true only when the operator said "at" a place. Seeing a place from far away is not being there.
+function reportLandmark(map, state, now, { thing, side }, standingAt = false) {
   let id = findLandmark(map, thing) ?? (thing ? null : state.pending_landmark);
   if (!id && !thing) id = state.pending_landmark;
   if (!id) {
-    const node = findNode(map, thing);
+    const node = standingAt ? findNode(map, thing) : null;
     if (node && state.pos) {
       state.pos = { node };
       state.conf = 'reported';
@@ -252,6 +254,12 @@ function reportLandmark(map, state, now, { thing, side }) {
     state.misses += 1;
     note(state, now, 'unknown_landmark', { thing: String(thing).slice(0, 40) });
     return state.misses >= MAX_MISSES ? handover(map, state, now, 'landmark not on the map')
+      : ask(map, state, now, 'Operator, what else do you see?');
+  }
+  if (side === 'ahead') {
+    state.misses += 1;
+    note(state, now, 'landmark_ahead', { id });
+    return state.misses >= MAX_MISSES ? handover(map, state, now, 'landmark has no side')
       : ask(map, state, now, 'Operator, what else do you see?');
   }
   if (side !== 'left' && side !== 'right') {
@@ -271,7 +279,7 @@ function reportLandmark(map, state, now, { thing, side }) {
 function setPosition(map, state, now, args) {
   const invalid = () => base(map, 'invalid', { say_operator: null, message: 'position not on the map' });
   if (args.node != null) {
-    if (!map.nodes[args.node] || !isHeading(args.heading)) return invalid();
+    if (!Object.hasOwn(map.nodes, args.node) || !isHeading(args.heading)) return invalid();
     state.pos = { node: args.node };
     state.heading = args.heading;
   } else {
@@ -291,8 +299,11 @@ function planRouteTool(map, state, now, { destination_id, lang }) {
   }
   state.requester = { lang: typeof lang === 'string' ? lang : null };
   state.arrived = false;
-  if (state.pos) return beginRoute(map, state, destination_id, now);
+  // After a handover, a guess or an unsure hold the saved position cannot be trusted: ask first.
+  const unsure = Boolean(state.handover) || state.conf === 'guess' || Boolean(state.hold_unsure);
+  if (state.pos && !unsure) return beginRoute(map, state, destination_id, now);
   state.pending_dest = destination_id;
+  if (state.pos) return ask(map, state, now);
   if (map.meta.start) {
     const say = map.meta.start.say;
     return base(map, 'need_start', { say_operator: say, step_id: issue(state, now, 'start', say, 6), ...summary(map, state) });
@@ -342,8 +353,10 @@ function nudgeFor(state, now) {
   if (late > (moving ? 23 : 15)) return { stage: 'handover' };
   if (moving && late > 13) return { stage: 'hold' };
   if (late > 5) {
+    // At the start and arrival questions a plain "yes, I am here" would be taken as the answer, so ask the real question again.
+    const again = !moving && aw.kind !== 'landmark';
     const say = walking ? 'Operator, have you stopped? Say yes or no.'
-      : moving ? 'Operator, did you turn? Say yes or no.' : 'Operator, are you there? Please answer.';
+      : moving ? 'Operator, did you turn? Say yes or no.' : again ? aw.say : 'Operator, are you there? Please answer.';
     return { stage: 'ask', say_operator: say };
   }
   return null;
@@ -392,10 +405,13 @@ function confirmStep(map, state, now, args) {
     return startHold(map, state, now, state.dest);
   }
   if (reply === 'see') return reportLandmark(map, state, now, { thing: args.thing, side: args.side });
-  if (reply === 'at') return reportLandmark(map, state, now, { thing: args.thing });
+  if (reply === 'at') return reportLandmark(map, state, now, { thing: args.thing }, true);
+  // A step id from the future means the saved state was lost or rolled back: do not leave the operator walking.
+  if (Number.isInteger(args.step_id) && args.step_id > state.step_seq) return handover(map, state, now, 'saved state lost');
   if (!aw) return base(map, 'nothing_pending', { say_operator: null, ...summary(map, state) });
   if (args.step_id !== aw.step_id) {
-    return base(map, 'stale', { say_operator: aw.say, step_id: aw.step_id, ...summary(map, state) });
+    // The operator already heard the current instruction, so say nothing a second time.
+    return base(map, 'stale', { say_operator: null, step_id: aw.step_id, ...summary(map, state) });
   }
   if (reply === 'wait') {
     aw.since = now;
@@ -471,6 +487,13 @@ export function runTool({ map, state, session_id: sessionId, tool, args = {}, no
   next.updated = now;
   const result = TOOLS[tool](map, next, now, args ?? {});
   return { state: next, result };
+}
+
+// Read-only calls must not write the session back: a slow read could put an old step back over a newer one.
+export function writesState(tool, result) {
+  if (tool === 'find_place') return false;
+  if (tool === 'get_state') return result?.nudge?.stage === 'hold' || result?.nudge?.stage === 'handover';
+  return true;
 }
 
 export { TURN_PENALTY };
