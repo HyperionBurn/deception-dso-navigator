@@ -43,6 +43,20 @@ Hackathon "Voice of the Oasis", Dtec, Dubai Silicon Oasis, 24-25 Nov 2026. A Man
 
 Six destinations are **not mapped**: the meeting room, the conference room and call booths 1 to 4. The agent says "not mapped yet" and offers the two mapped places.
 
+## 4b. If you run in the cloud
+
+You have the repo but not Wasif's laptop. Without secrets you can still run `npm test`, `npm run map:check`, the bridge tests, and read all the evidence. For anything live you need these, given to you as secrets (never commit them, never print them):
+
+| Secret | Needed for |
+|---|---|
+| `ELEVENLABS_API_KEY` | `push-agent.mjs`, `tests/floor-drive.mjs`, `tests/live-voice-smoke.mjs`, changing agent or tool settings |
+| The team access code, saved as `app/.private/team-access-code.txt` | `tests/live-voice-smoke.mjs`, the bridge in laptop mode |
+| The route tool key, saved as `app/.private/route-tool-key.txt` | Calling the production route tool directly |
+| Vercel login for Wasif's project (token, org id, project id) | `npx vercel --prod --yes` |
+| The rehearsal agent id | Trying a prompt on the rehearsal agent before production |
+
+Put `ELEVENLABS_API_KEY=...` in `app/.env.local` (git-ignored) and run the scripts with `node --env-file=.env.local`. The production agent id is the default in `app/scripts/push-agent.mjs`. If a secret is missing, do the work that needs none, and list exactly what you could not run.
+
 ## 5. Map of the repo
 
 | Path | What it is |
@@ -59,7 +73,8 @@ Six destinations are **not mapped**: the meeting room, the conference room and c
 | `CONNECT_TO_ROBOT.md` | Venue runbook for the bridge. `ROBOT_TEST_HANDOFF_FOR_AI_AGENT.md` is the longer, older version. |
 | `qa/` | Survey, floor evidence, test cases, Hussain's simulation report (`qa/sim/`). |
 | `submission/` | Jury cues and the judge packet draft, with blanks to fill after filming. |
-| `.cache/floor/` (Wasif's laptop only, not in git) | Video frames (`hires/` is 1920 px, two per second, frame N is at N/2 seconds), transcripts, OCR results (`ocr_*.tsv`), saved drill outputs. The three videos are in Wasif's Downloads folder (`IMG_3440.MOV` is the Dtec floor). |
+| `evidence/` | Copied from Wasif's laptop: video frames of the floor (`evidence/floor/hires_dtec/` is 1920 px, two per second, frame N is at N/2 seconds), transcripts, OCR results, and the last live test outputs. Start with `evidence/README.md`. |
+| `docs/organisers/`, `robot/reference/` | The organisers' documents, their robot bridge, and the text of the AgiBot X2 developer pages. |
 
 ## 6. How to do the common jobs (run from `app/` unless it says otherwise)
 
@@ -105,7 +120,7 @@ All of it comes from one phone video with narration (`IMG_3440.MOV`, 18:47 on 24
 
 What was searched for the missing places:
 - The narrator never says meeting, conference, booth, call or phone.
-- OCR of every frame of the Dtec part (0:00-2:17, two frames per second) found no sign with those words. It did read "PRINTER SCANNER LOCKERS", "Write Something", "TOILET" and two tenant plaques.
+- OCR of every frame of all three videos (two frames per second) found no sign with those words. The organisers' PDFs contain no floor plan. It did read "PRINTER SCANNER LOCKERS", "Write Something", "TOILET" and two tenant plaques.
 - Guesses that are **not** in the map: the pitch room (rows of chairs, screens) could be the "conference room"; the glass room with sofas at its far end could be the "meeting room"; the organisers' example "past the kitchen and stop at the second booth" suggests the booths are further along the walkway than the cafeteria. None of this is evidence.
 
 ## 8. Open work, most important first
@@ -116,7 +131,7 @@ What was searched for the missing places:
 
 **P3. Redeploy production from `main`** so the planner change from PR #12 goes live. Check the route tool afterwards.
 
-**P4. Robot slot (tomorrow).** In this order: copy the new `navigator_bridge.py` to the robot (the copy there has the half-speed voice bug); check the voice is smooth; walk both mapped routes there and back and note every wrong turn or landmark; rehearse the three film takes; restore the robot and copy the logs (`CONNECT_TO_ROBOT.md` step 9). Ask for the newest file in `~/deception/logs/` if anything sounds wrong.
+**P4. Robot slot (Wednesday 25 Nov).** Team Guide v2 gives our round 2 as 07:30, code freeze and submission at 08:30, and our pitch at 09:41; the Update says slots were reshuffled, so Wasif must confirm the times. In this order: copy the new `navigator_bridge.py` to the robot (the copy there has the half-speed voice bug); check the voice is smooth; walk both mapped routes there and back and note every wrong turn or landmark; rehearse the three film takes; restore the robot and copy the logs (`CONNECT_TO_ROBOT.md` step 9). Ask for the newest file in `~/deception/logs/` if anything sounds wrong.
 
 **P5. Planner problems T1 to T5 in the same report.** T1 (a whole sentence resolves to the wrong place) and T3 ("the cafeteria is on my left" counts as being there) are the risky ones. Any planner change needs a test and a deploy.
 
@@ -133,7 +148,7 @@ What was searched for the missing places:
 - **Agent daily limit.** If every conversation closes at once with code 4300, the agent's `platform_settings.call_limits.daily_limit` is used up.
 - **Live tests can hang.** Always set a time limit. One hung test cost 45 minutes tonight.
 - **This shell (Git Bash on Windows):** a heredoc longer than about 9,000 characters gets cut off; write long files in pieces. A double backslash inside a heredoc arrives as a single one. `rg` is not installed. Use `py -3.11` for packages that fail on the default Python (pycolmap, rapidocr).
-- **Subagents cannot see images.** Look at frames yourself, or run OCR (`.cache/floor/ocr_run.py`).
-- **Low-resolution frames lie about colour.** The peach/yellow mistake came from 960 px frames. Use `.cache/floor/hires/`.
-- **The bridge had three faults nobody saw until the robot:** half-speed playback, and two microphone QoS settings that differed from the organisers' bridge (`.cache/org-bridge.py` is a copy of theirs). Compare against their file line by line before trusting ours.
+- **Subagents cannot see images.** Look at frames yourself, or run OCR (`evidence/floor/ocr/ocr_run.py`).
+- **Low-resolution frames lie about colour.** The peach/yellow mistake came from 960 px frames. Use `evidence/floor/hires_dtec/`.
+- **The bridge had three faults nobody saw until the robot:** half-speed playback, and two microphone QoS settings that differed from the organisers' bridge (`robot/reference/organisers_elevenlabs_robot_bridge.py` is a copy of theirs). Compare against their file line by line before trusting ours.
 - **Do not claim "matches" or "works" without running it.** Say "not tested on the robot" when that is the truth.
