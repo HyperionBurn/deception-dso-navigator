@@ -75,19 +75,25 @@ function browser(t, { urls = [signed], media } = {}) {
     t.after(() => before ? Object.defineProperty(globalThis, name, before) : delete globalThis[name]);
   };
   const stream = () => {
-    const track = { stopped: false, stop() { this.stopped = true; } };
+    const track = new class extends EventTarget {
+      stopped = false;
+      readyState = 'live';
+      stop() { this.stopped = true; this.readyState = 'ended'; }
+      end() { this.readyState = 'ended'; this.dispatchEvent(new Event('ended')); }
+    }();
     calls.tracks.push(track);
     return { getTracks: () => [track] };
   };
   install('navigator', { mediaDevices: { getUserMedia: media ? () => media(stream) : async () => stream() } });
-  install('AudioContext', class {
+  install('AudioContext', class extends EventTarget {
     state = 'suspended';
     currentTime = 1;
     destination = {};
     audioWorklet = { addModule: async () => {} };
-    constructor() { calls.contexts.push(this); }
+    constructor() { super(); calls.contexts.push(this); }
     async resume() { this.state = 'running'; }
     async close() { this.state = 'closed'; }
+    interrupt() { this.state = 'interrupted'; this.dispatchEvent(new Event('statechange')); }
     createMediaStreamSource() { return { connect() {}, disconnect() {} }; }
     createBuffer(_, n, rate) {
       assert.equal(rate, 16000);
@@ -126,6 +132,10 @@ function browser(t, { urls = [signed], media } = {}) {
     send(data) { this.sent.push(JSON.parse(data)); }
     close() { this.readyState = 3; }
     receive(event) { this.onmessage({ data: JSON.stringify(event) }); }
+    remoteClose(code = 1000, wasClean = true) {
+      this.readyState = 3;
+      this.onclose?.({ code, wasClean });
+    }
   });
   return calls;
 }
@@ -136,6 +146,16 @@ const metadata = (input = 'pcm_16000', output = 'pcm_16000') => ({
 });
 const audio = id => ({ type: 'audio', audio_event: { event_id: id, audio_base_64: 'AID/fw==' } });
 const frame = () => ({ data: { pcm: new ArrayBuffer(640), level: 0.5 } });
+
+async function connect(session, calls) {
+  const started = session.start('test-only');
+  await tick();
+  const socket = calls.sockets.at(-1);
+  socket.open();
+  socket.receive(metadata());
+  assert.equal(await started, true);
+  return socket;
+}
 
 test('session negotiates before sending or playing PCM, echoes ping, and drops stale audio', async t => {
   const calls = browser(t);
@@ -246,4 +266,113 @@ test('stop settles startup and cleans up a microphone that arrives after a new s
   assert.deepEqual(calls.contexts.map(context => context.state), ['closed', 'running']);
   assert.deepEqual(states, ['starting', 'idle', 'starting', 'connecting', 'listening']);
   assert.equal(calls.requests.length, 1);
+});
+
+test('unanswered microphone permission times out and a late stream is stopped', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let grant;
+  const calls = browser(t, { media: stream => new Promise(resolve => { grant = () => resolve(stream()); }) });
+  const states = [];
+  const session = new VoiceSession({ onState: state => states.push(state) });
+  t.after(() => session.stop());
+  const started = session.start('test-only');
+  assert.equal(states.at(-1).phase, 'starting');
+  assert.match(states.at(-1).detail, /allow microphone/i);
+  t.mock.timers.tick(30000);
+  assert.equal(states.at(-1).phase, 'error');
+  assert.equal(await started, false);
+  assert.match(states.at(-1).detail, /permission.*timed out/i);
+  assert.equal(calls.contexts[0].state, 'closed');
+  grant();
+  await tick();
+  assert.equal(calls.tracks[0].stopped, true);
+  assert.equal(calls.requests.length, 0);
+});
+
+for (const [device, interrupt] of [
+  ['audio context', calls => calls.contexts[0].interrupt()],
+  ['microphone track', calls => calls.tracks[0].end()],
+]) {
+  test(`${device} interruption stops a live session and requests a restart`, async t => {
+    const calls = browser(t);
+    const states = [];
+    const session = new VoiceSession({ onState: state => states.push(state) });
+    t.after(() => session.stop());
+    const socket = await connect(session, calls);
+    socket.receive(audio(1));
+    interrupt(calls);
+    assert.equal(states.at(-1).phase, 'error');
+    assert.match(states.at(-1).detail, /start microphone again/i);
+    assert.equal(states.at(-1).mic, false);
+    assert.equal(states.at(-1).speaker, false);
+    assert.equal(socket.readyState, 3);
+    assert.equal(calls.tracks[0].stopped, true);
+    assert.equal(calls.sources[0].stopped, true);
+    assert.equal(calls.contexts[0].state, 'closed');
+  });
+}
+
+test('clean close releases capture and drains every scheduled source before ending', async t => {
+  const calls = browser(t);
+  const states = [];
+  const session = new VoiceSession({ onState: state => states.push(state) });
+  t.after(() => session.stop());
+  const socket = await connect(session, calls);
+  socket.receive(audio(1));
+  socket.receive(audio(1));
+  const [first, last] = calls.sources;
+  socket.remoteClose();
+  assert.equal(calls.tracks[0].stopped, true);
+  assert.equal(calls.captures[0].closed, true);
+  assert.equal(socket.onmessage, null);
+  assert.equal(calls.contexts[0].state, 'running');
+  assert.equal(states.at(-1).phase, 'speaking');
+  assert.equal(states.at(-1).mic, false);
+  assert.equal(states.at(-1).connected, false);
+  first.onended();
+  assert.equal(states.at(-1).phase, 'speaking');
+  last.onended();
+  assert.equal(states.at(-1).phase, 'idle');
+  assert.equal(calls.contexts[0].state, 'closed');
+  assert.ok(calls.sources.every(source => !source.stopped));
+});
+
+for (const [reason, finish] of [
+  ['deadline', t => t.mock.timers.tick(5000)],
+  ['manual Stop', (_, session) => session.stop()],
+]) {
+  test(`${reason} ends a clean-close drain with audio still pending`, async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const calls = browser(t);
+    const states = [];
+    const session = new VoiceSession({ onState: state => states.push(state) });
+    t.after(() => session.stop());
+    const socket = await connect(session, calls);
+    socket.receive(audio(1));
+    socket.remoteClose();
+    assert.equal(states.at(-1).phase, 'speaking');
+    finish(t, session);
+    assert.equal(states.at(-1).phase, 'idle');
+    assert.equal(calls.sources[0].stopped, true);
+    assert.equal(calls.contexts[0].state, 'closed');
+  });
+}
+
+test('an error with close code 1000 still stops playback immediately', async t => {
+  const calls = browser(t, { urls: [signed, signed, signed] });
+  const states = [];
+  const session = new VoiceSession({ onState: state => states.push(state) });
+  t.after(() => session.stop());
+  for (const fail of [
+    socket => socket.remoteClose(1000, false),
+    socket => { socket.onerror(); socket.remoteClose(); },
+    socket => { socket.receive({ type: 'client_error' }); socket.remoteClose(); },
+  ]) {
+    const socket = await connect(session, calls);
+    socket.receive(audio(1));
+    fail(socket);
+    assert.equal(states.at(-1).phase, 'error');
+    assert.equal(calls.sources.at(-1).stopped, true);
+    assert.equal(calls.contexts.at(-1).state, 'closed');
+  }
 });

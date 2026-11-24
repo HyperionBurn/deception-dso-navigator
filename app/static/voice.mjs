@@ -3,7 +3,9 @@ const RATE = 16000;
 const SOCKET_BUFFER_LIMIT = 32 * 1024;
 const MESSAGE_LIMIT = 256 * 1024;
 const PLAYBACK_SECONDS = 12;
+const PERMISSION_TIMEOUT = 30000;
 const START_TIMEOUT = 15000;
+const DRAIN_TIMEOUT = 5000;
 
 function signedSocketUrl(value) {
   if (typeof value !== 'string' || value.length > 8192 || /[\s#\p{Cc}]/u.test(value)) throw new Error();
@@ -43,7 +45,7 @@ export class VoiceSession {
       state: { phase: 'starting', mic: false, connected: false, speaker: false },
     };
     this.#run = run;
-    this.#state(run, 'starting');
+    this.#state(run, 'starting', { detail: 'Allow microphone access if your browser asks.' });
     if (this.#run === run) void this.#open(run, accessCode);
     return ready;
   }
@@ -70,16 +72,35 @@ export class VoiceSession {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error();
       const context = new AudioContext();
       run.context = context;
+      run.timer = setTimeout(() => this.#end(run, 'error',
+        'Microphone permission timed out. Select Start microphone again.'), PERMISSION_TIMEOUT);
       const captured = navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
       }).then(stream => {
         if (this.#run === run) {
           run.stream = stream;
+          clearTimeout(run.timer);
           run.timer = setTimeout(() => this.#end(run, 'error', 'The voice connection timed out.'), START_TIMEOUT);
+          const ended = () => this.#end(run, 'error', 'Microphone audio stopped. Select Start microphone again.');
+          for (const track of stream.getTracks()) {
+            track.addEventListener('ended', ended, { signal: run.abort.signal });
+            if (track.readyState === 'ended') {
+              ended();
+              break;
+            }
+          }
         } else stopTracks(stream);
       });
       const resumed = (async () => context.resume())();
       await Promise.all([captured, resumed]);
+      if (this.#run !== run) return;
+      run.audioStateChanged = () => {
+        if (context.state !== 'running') {
+          this.#end(run, 'error', 'Browser audio stopped. Select Start microphone again.');
+        }
+      };
+      context.addEventListener('statechange', run.audioStateChanged);
+      run.audioStateChanged();
       if (this.#run !== run) return;
       this.#state(run, 'connecting', { mic: true });
       if (this.#run !== run) return;
@@ -116,8 +137,8 @@ export class VoiceSession {
       };
       socket.onmessage = ({ data }) => this.#message(run, data);
       socket.onerror = () => this.#end(run, 'error', 'The voice connection failed.');
-      socket.onclose = ({ code }) => {
-        if (code === 1000 && run.negotiated) this.#end(run, 'idle');
+      socket.onclose = ({ code, wasClean }) => {
+        if (code === 1000 && wasClean && run.negotiated) this.#drain(run);
         else this.#end(run, 'error', 'The voice connection closed.');
       };
     } catch {
@@ -133,19 +154,19 @@ export class VoiceSession {
   }
 
   #capture(run, data) {
-    if (this.#run !== run || !run.negotiated || !(data?.pcm instanceof ArrayBuffer) ||
+    if (this.#run !== run || !run.capture || !run.negotiated || !(data?.pcm instanceof ArrayBuffer) ||
         data.pcm.byteLength !== 640) return;
     run.capture.port.postMessage('ack');
     if (run.queued) return;
     const level = Number.isFinite(data.level) ? Math.min(1, Math.max(0, data.level)) : 0;
     this.#emit('onLevel', level);
-    if (this.#run !== run || run.socket.bufferedAmount > SOCKET_BUFFER_LIMIT - 1024) return;
+    if (this.#run !== run || !run.socket || run.socket.bufferedAmount > SOCKET_BUFFER_LIMIT - 1024) return;
     const pcm = btoa(String.fromCharCode(...new Uint8Array(data.pcm)));
     this.#send(run, { user_audio_chunk: pcm });
   }
 
   #message(run, data) {
-    if (this.#run !== run) return;
+    if (this.#run !== run || !run.socket) return;
     if (typeof data !== 'string' || data.length > MESSAGE_LIMIT) {
       this.#end(run, 'error', 'The voice server sent an invalid message.');
       return;
@@ -253,7 +274,8 @@ export class VoiceSession {
         source.disconnect();
         if (!run.sources.size && this.#run === run) {
           run.nextTime = 0;
-          if (!run.queued) this.#state(run, 'listening');
+          if (run.draining) this.#end(run, 'idle');
+          else if (!run.queued) this.#state(run, 'listening');
         }
       };
       source.start(start);
@@ -275,25 +297,46 @@ export class VoiceSession {
     run.nextTime = 0;
   }
 
-  #end(run, phase, detail) {
-    if (this.#run !== run) return;
-    this.#run = undefined;
-    run.settle(false);
-    clearTimeout(run.timer);
+  #drain(run) {
+    if (this.#run !== run || run.draining) return;
+    if (!run.sources.size) {
+      this.#end(run, 'idle');
+      return;
+    }
+    run.draining = true;
+    this.#releaseCapture(run);
+    run.timer = setTimeout(() => this.#end(run, 'idle'), DRAIN_TIMEOUT);
+    this.#state(run, 'speaking', { mic: false, connected: false, pcm: undefined });
+  }
+
+  #releaseCapture(run) {
     run.abort.abort();
     if (run.socket) {
       run.socket.onopen = run.socket.onmessage = run.socket.onclose = run.socket.onerror = null;
       try { run.socket.close(1000); } catch { /* already closed */ }
+      run.socket = undefined;
     }
     if (run.capture) {
       run.capture.port.onmessage = null;
       run.capture.onprocessorerror = null;
       run.capture.port.close();
       run.capture.disconnect();
+      run.capture = undefined;
     }
     run.input?.disconnect();
+    run.input = undefined;
     stopTracks(run.stream);
+    run.stream = undefined;
+  }
+
+  #end(run, phase, detail) {
+    if (this.#run !== run) return;
+    this.#run = undefined;
+    run.settle(false);
+    clearTimeout(run.timer);
+    this.#releaseCapture(run);
     this.#clearPlayback(run);
+    if (run.audioStateChanged) run.context.removeEventListener('statechange', run.audioStateChanged);
     if (run.context && run.context.state !== 'closed') void run.context.close().catch(() => {});
     this.#emit('onLevel', 0);
     if (!this.#run) this.#emit('onState', { phase, detail, mic: false, connected: false, speaker: false });
