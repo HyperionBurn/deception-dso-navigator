@@ -443,6 +443,12 @@ class JudgeScreen:
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
+                # Refuse other Host names so a web page cannot read the
+                # transcript through DNS rebinding.
+                port = self.server.server_address[1]
+                if self.headers.get('Host') not in (f'127.0.0.1:{port}', f'localhost:{port}'):
+                    self.send_error(403)
+                    return
                 if self.path not in ('/', '/index.html'):
                     self.send_error(404)
                     return
