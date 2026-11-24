@@ -2,7 +2,7 @@
   "presence_from_mic": true,
   "quiet_end_s": 20.0,
   "route_active": false,
-  "route_tools": ["next_route_step"],
+  "route_tools": ["plan_route", "confirm_step", "report_landmark", "change_destination", "next_route_step"],
   "route_idle_s": 300.0,
   "default_lang": "en",
   "source_label": "robot",

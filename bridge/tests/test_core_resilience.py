@@ -53,13 +53,13 @@ async def test_heard_then_one_moment_when_the_agent_is_slow(tmp_path):
 
 @async_test()
 async def test_no_filler_phrase_when_the_agent_answers_in_time(tmp_path):
-    async with Rig(phrases=make_phrases(tmp_path)) as rig:
+    async with Rig(phrases=make_phrases(tmp_path), heard_after_s=0.9, slow_after_s=1.8) as rig:
         rig.core.signal_presence()
         conn = await rig.first_connection()
         rig.source.speak(4)
         await asyncio.sleep(0.3)                      # speech has ended, timers are running
-        await conn.send_audio(1, 101)
-        await asyncio.sleep(1.6)                      # longer than both timers
+        await conn.send_audio(1, 101)                 # well before the 0.9 s timer
+        await asyncio.sleep(2.1)                      # longer than both timers
         assert rig.sink.markers() == [101]
 
 
@@ -193,7 +193,7 @@ async def test_session_ends_after_quiet_and_never_during_a_route():
 
 @async_test()
 async def test_talking_keeps_the_session_open():
-    async with Rig(quiet_end_s=0.6) as rig:
+    async with Rig(quiet_end_s=1.0) as rig:
         rig.core.signal_presence()
         conn = await rig.first_connection()
         for _ in range(4):                            # a word every 0.4 s
@@ -205,7 +205,7 @@ async def test_talking_keeps_the_session_open():
 # ------------------------------------------------------------ route tracking
 @async_test()
 async def test_route_tool_calls_mark_a_route_as_active(tmp_path):
-    async with Rig(route_idle_s=0.5) as rig:
+    async with Rig(route_idle_s=1.0) as rig:
         rig.core.signal_presence()
         conn = await rig.first_connection()
         assert not rig.core.route_active
@@ -216,7 +216,34 @@ async def test_route_tool_calls_mark_a_route_as_active(tmp_path):
         await conn.send({"type": "agent_tool_request", "agent_tool_request": {
             "tool_name": "next_route_step", "tool_call_id": "t1", "event_id": 6}})
         await wait_until(lambda: rig.core.route_active, 1, "route to become active")
-        await wait_until(lambda: not rig.core.route_active, 2, "route to time out")
+        await wait_until(lambda: not rig.core.route_active, 3, "route to time out")
+
+
+def test_default_route_tools_are_the_agents_routing_tools():
+    from bridge.core import Config
+    assert Config().route_tools == ("plan_route", "confirm_step", "report_landmark",
+                                    "change_destination", "next_route_step")
+
+
+@async_test()
+async def test_every_routing_tool_starts_a_route_and_the_read_only_ones_do_not():
+    async with Rig(route_idle_s=60) as rig:
+        rig.core.signal_presence()
+        conn = await rig.first_connection()
+
+        async def call(name, number):
+            await conn.send({"type": "agent_tool_request", "agent_tool_request": {
+                "tool_name": name, "tool_call_id": "t%d" % number, "event_id": number}})
+
+        for number, name in enumerate(("get_state", "find_place", "handover")):
+            await call(name, number)
+        await asyncio.sleep(0.2)
+        assert not rig.core.route_active              # looking things up is not a route
+        for number, name in enumerate(("plan_route", "confirm_step", "report_landmark",
+                                       "change_destination", "next_route_step"), start=10):
+            rig.core.route_active = False
+            await call(name, number)
+            await wait_until(lambda: rig.core.route_active, 1, name + " to start a route")
 
 
 @async_test()

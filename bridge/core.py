@@ -58,7 +58,10 @@ class Config:
     presence_from_mic: bool = True     # voice at the mic counts as "someone is there"
     quiet_end_s: float = 20.0          # end the session after this much quiet
     route_active: bool = False         # the app can set this; true = never end the session
-    route_tools: tuple = ("next_route_step",)   # server tools whose use means "a route is active"
+    # Server tools whose use means "a route is active". get_state, find_place and handover
+    # are left out on purpose: they do not walk anyone anywhere.
+    route_tools: tuple = ("plan_route", "confirm_step", "report_landmark", "change_destination",
+                          "next_route_step")
     route_idle_s: float = 300.0        # a route counts as active this long after its last tool call
     default_lang: str = "en"           # language of the local phrases at the start of a session
     source_label: str = "robot"        # dynamic variable "source"

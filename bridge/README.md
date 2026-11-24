@@ -166,9 +166,11 @@ the only outside package is `websockets` (version 13 or newer).
   `agent_tool_response_full_payload`. Without `agent_tool_request` the bridge cannot know a route
   started (use `core.route_active` then). The docs say `agent_tool_response_full_payload` has to be
   switched on. Both audio formats must be `pcm_16000`, or the bridge stops with an error.
-- **Route tracking:** a route counts as active for `route_idle_s` (300 s) after each call of the
-  tool `next_route_step` (name taken from `agent/setup.md`), and ends early when that tool's full
-  result contains `at_destination`. These rules are our guess.
+- **Route tracking:** a route counts as active for `route_idle_s` (300 s) after each call of one
+  of the routing tools: `plan_route`, `confirm_step`, `report_landmark`, `change_destination`,
+  `next_route_step` (the list is `route_tools`; `get_state`, `find_place` and `handover` do not
+  count). It ends early when one of those tools' full result contains `at_destination`. The tool
+  names are the agent's current webhook tools; the rules are our guess.
 - **`resumed`** is always sent (`false` on the first connection, `true` after a reconnect). The
   brief only asked for `true` on reconnects.
 - **Stale audio:** we copy `voice.mjs` (drop if `event_id` is lower than the last interruption).
