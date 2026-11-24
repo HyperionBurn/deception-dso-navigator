@@ -1,0 +1,39 @@
+{
+  "presence_from_mic": true,
+  "quiet_end_s": 20.0,
+  "route_active": false,
+  "route_tools": ["next_route_step"],
+  "route_idle_s": 300.0,
+  "default_lang": "en",
+  "source_label": "robot",
+
+  "mic_gate": "none",
+  "echo_tail_s": 0.3,
+  "speech_threshold": 500,
+  "speech_min_chunks": 2,
+  "end_silence_s": 0.6,
+  "preroll_s": 1.0,
+
+  "allow_unreviewed_phrases": false,
+  "heard_after_s": 1.5,
+  "slow_after_s": 4.0,
+
+  "backoff_start_s": 1.0,
+  "backoff_max_s": 15.0,
+  "link_give_up_s": 120.0,
+  "connect_timeout_s": 6.0,
+  "metadata_timeout_s": 10.0,
+  "ws_ping_interval_s": 5.0,
+  "ws_ping_timeout_s": 5.0,
+
+  "latency_csv": "latency.csv",
+
+  "site_url": "https://deception-dso-navigator.vercel.app",
+  "ros_mic_stream": 0,
+  "ros_lead_s": 0.3,
+  "wav_in": "",
+  "wav_out": "out.wav",
+  "wav_realtime": true,
+  "laptop_input_device": "",
+  "laptop_output_device": ""
+}
