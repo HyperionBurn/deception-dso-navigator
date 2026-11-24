@@ -1,0 +1,12 @@
+Voice of the Oasis — AI Voice Navigator, Robot A
+Source: Voice of the Oasis Team Guide Update, 24 November 2026, pp. 1–3 and 6. The revised navigator challenge replaces the earlier destination guide.
+
+The guide lists these places on the event floor at Dtec. Arabic names below are for conversation. They do not establish the text of physical signs.
+
+- Meeting room — غرفة الاجتماعات
+- Conference room — قاعة المؤتمرات
+- Four call booths — أربع كبائن للمكالمات
+- Team tables — طاولات الفرق
+- Kitchen with tables and food — المطبخ، وفيه طاولات وطعام
+
+The team has not verified the floor layout, the robot's position or heading, any destination endpoint, or any physical route. The guide does not establish booth numbering, table assignments, signs, distances, or turns. Do not use its example as route data. Do not route outside the event floor.

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101e1a">
+  <meta name="description" content="Team Deception’s bilingual voice navigator guides a MangoBot operator in spoken English.">
+  <title>Voice of the Oasis · Team Deception</title>
+  <link rel="stylesheet" href="./app.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="masthead">
+      <p class="identity"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span> TEAM DECEPTION</p>
+      <p class="location"><span aria-hidden="true"></span> DUBAI SILICON OASIS</p>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div class="eyebrow"><span></span> OPERATOR-GUIDED NAVIGATOR</div>
+        <h1 id="page-title">Voice of the <em>Oasis.</em></h1>
+        <p>The visitor speaks Arabic. The AI Navigator clarifies the request, guides the operator in English, and confirms arrival in Arabic.</p>
+      </section>
+
+      <div class="console">
+        <section class="control panel" aria-labelledby="mode-title">
+          <div class="mode-switch" role="group" aria-label="Demo mode" id="mode-switch" hidden>
+            <button type="button" id="live-mode" aria-pressed="false">Live voice</button>
+            <button type="button" id="practice-mode" aria-pressed="true">Offline practice</button>
+          </div>
+          <div class="control-body">
+            <span class="overline" id="mode-label">01 / PRACTICE</span>
+            <h2 id="mode-title">Offline practice</h2>
+            <p id="mode-description">Follow a scripted conversation, one step at a time. Practice uses fictional markers and no microphone.</p>
+            <div class="signal" aria-hidden="true">
+              <svg viewBox="0 0 220 56" fill="none">
+                <path d="M1 28h27l7-9 8 18 11-29 10 40 11-27 9 11 9-4h12l8-11 10 24 13-37 10 48 11-31 9 13 8-6h45" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div id="practice-controls">
+              <label for="practice-scenario">Simulated scenario</label>
+              <select id="practice-scenario">
+                <option value="easy">Clarify, guide, and stop</option>
+                <option value="noise">Background music · ask to repeat</option>
+                <option value="reroute">Destination change · hold and reroute</option>
+              </select>
+              <button class="primary" id="practice-next" type="button">Start practice <span aria-hidden="true">→</span></button>
+            </div>
+            <p class="operator-note" id="operator-note" hidden>MangoBot operator follows spoken English directions; the site never controls movement.</p>
+            <form id="live-controls" autocomplete="off" hidden>
+              <label for="access-code">Team access code</label>
+              <input id="access-code" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+              <button class="primary" id="live-start" type="submit">Start microphone <span aria-hidden="true">→</span></button>
+              <button class="primary stop" id="live-stop" type="button" hidden>Stop microphone <span aria-hidden="true">■</span></button>
+              <div class="meter" id="meter" hidden>
+                <span>Microphone level</span>
+                <progress id="mic-level" max="1" value="0" aria-label="Microphone level"></progress>
+              </div>
+            </form>
+            <p class="availability" id="availability" role="status"></p>
+          </div>
+        </section>
+
+        <section class="conversation panel" aria-labelledby="conversation-title">
+          <header class="conversation-head">
+            <div>
+              <span class="overline">02 / SESSION</span>
+              <h2 id="conversation-title">Conversation</h2>
+            </div>
+            <button class="reset" id="reset" type="button" disabled>New visitor</button>
+          </header>
+          <div class="session-strip">
+            <p class="session-status" id="session-status" role="status" aria-atomic="true"><span class="dot" aria-hidden="true"></span><span id="status-text">Practice ready</span></p>
+            <span class="badge" id="session-kind">SIMULATED</span>
+          </div>
+          <div class="devices" id="devices" hidden>
+            <span id="mic-state">Mic off</span><span id="connection-state">Disconnected</span><span id="speaker-state">Speaker idle</span><span id="pcm-state" hidden></span>
+          </div>
+          <p class="detail" id="status-detail" role="status" hidden></p>
+          <div class="transcript" id="transcript" tabindex="0" aria-label="Conversation transcript">
+            <div class="empty" id="transcript-empty">
+              <span class="empty-mark" aria-hidden="true">✳</span>
+              <p id="empty-title">A conversation starts here.</p>
+              <p id="empty-hint">Choose a scenario and start the simulation.</p>
+            </div>
+            <ol class="messages" id="messages" role="log" aria-label="Conversation messages"></ol>
+          </div>
+          <footer class="conversation-foot">This console does not save the transcript. Select New visitor to clear it.</footer>
+        </section>
+      </div>
+    </main>
+    <footer class="site-foot">
+      <span>VOICE OF THE OASIS <span aria-hidden="true">/</span> TEAM DECEPTION</span>
+      <span>Practice markers are fictional <span aria-hidden="true">·</span> No verified floor routes</span>
+    </footer>
+    <noscript><p class="noscript">Enable JavaScript to use the conversation demo.</p></noscript>
+  </div>
+</body>
+</html>

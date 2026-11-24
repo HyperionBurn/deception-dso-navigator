@@ -1,0 +1,14 @@
+# Spoken QA scripts | Updated course
+
+Use the current surveyed revision for any walk. Replace bracketed labels with observed values, never sample directions. Have a fluent Arabic speaker check pronunciation and meaning. Start a clean session per route. Cue phrases below are examples of dialogue, with no implied floor layout.
+
+| ID | Run | What the observer must hear and see |
+|---|---|---|
+| HOLD | Before walking, use an unknown pose or an unavailable on-floor target. On a separate attempt, withhold the acknowledgment or report a mismatched cue. | Agent asks for the observed reference and heading. No movement command from an unknown state, no second step on silence or mismatch, and no arrival. It calls “Stop” if moving, or “Hold position” if stationary. |
+| EASY | At the checked start, say «أبغى مكان هادي أقدر أسوي فيه مكالمة.» (“I want somewhere quiet to make a call.”) If an approved booth is reachable, confirm when asked whether a call booth will do. Otherwise choose a different scoped request and log it. | Arabic clarification and confirmation. English one-command steps with individual acknowledgments. Correct endpoint, explicit stop, stationary confirmation and endpoint evidence, then Arabic arrival. |
+| MUSIC | A visitor says «لو سمحت، أبغى أروح إلى [اسم الوجهة].» (“Please, I want to go to [destination].”) Rehearse with room music. At filming, the organizer supplies and plays the track. | Agent clarifies anything it misheard without repeating a stale action or moving on uncertain intent. Visitor and English operator speech remain intelligible and the route completes with verified stop and arrival. |
+| CHANGE | Start an approved multi-step route. Mid-route, a second person requests a different destination. Example: «ممكن نروح إلى [الوجهة الجديدة] بدلها؟» In rehearsal an observer picks the replacement during the run. At filming the organizer discloses it. | Agent calls stop and waits for a stationary acknowledgment. It drops pending old commands, confirms current cue and facing, tells both people what changed, and plans from that confirmed state. It completes with verified stop and arrival if the path is surveyed. |
+
+**Operator exchange:** Agent: “[One checked English command].” Operator: “Done. At [cue], facing [reference].” At arrival: Agent: “Stop.” Operator: “Stopped at [endpoint cue], facing [reference].” The observer checks this against the endpoint evidence. An acknowledgment is a report of observation, not an instruction to the operator to choose a path.
+
+**Fail any affected case** for a guessed step, a multi-command turn, advancement without acknowledgment, an operator choosing the route, a missed change, a false arrival, or intervention. In CHANGE, a safe hold on an unsupported pose or path is proper fallback but does not pass the changed-route objective. No credit for a simulated walk or a browser-only take.

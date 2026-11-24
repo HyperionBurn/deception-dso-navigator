@@ -1,0 +1,68 @@
+{
+  "schema_version": 2,
+  "candidate_revision": "",
+  "course_revision": "",
+  "survey": {
+    "status": "NOT_RUN",
+    "evidence": ""
+  },
+  "blind_walk": {
+    "HOLD": {
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    "EASY": {
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    "MUSIC": {
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    "CHANGE": {
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  },
+  "robot_audio": {
+    "status": "NOT_RUN",
+    "evidence": ""
+  },
+  "films": {
+    "EASY": {
+      "status": "NOT_RUN",
+      "evidence": "",
+      "duration_s": null,
+      "languages": [],
+      "one_take": null,
+      "cast_in_shot": null,
+      "verified_stop_and_arrival": null
+    },
+    "MUSIC": {
+      "status": "NOT_RUN",
+      "evidence": "",
+      "duration_s": null,
+      "languages": [],
+      "one_take": null,
+      "cast_in_shot": null,
+      "verified_stop_and_arrival": null,
+      "organizer_music": null
+    },
+    "CHANGE": {
+      "status": "NOT_RUN",
+      "evidence": "",
+      "duration_s": null,
+      "languages": [],
+      "one_take": null,
+      "cast_in_shot": null,
+      "verified_stop_and_arrival": null,
+      "organizer_change_mid_route": null
+    }
+  },
+  "video": {
+    "status": "NOT_RUN",
+    "evidence": "",
+    "duration_s": null,
+    "cuts_only_between_routes": null
+  }
+}

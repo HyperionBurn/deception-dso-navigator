@@ -1,0 +1,8 @@
+.env
+.env.*
+.cache/
+.private/
+.vercel/
+node_modules/
+tests/
+*.log
