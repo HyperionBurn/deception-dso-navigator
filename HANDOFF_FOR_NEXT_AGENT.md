@@ -1,3 +1,47 @@
+# Report for Wasif (night of 24-25 Nov, Devin)
+
+**Missing secrets.** This session had no `ELEVENLABS_API_KEY`, `ROUTE_TOOL_KEY` or `VERCEL_TOKEN`. Not run: `tests/floor-drive.mjs`, `tests/live-voice-smoke.mjs`, the prompt push, the production route tool, the Vercel deploy. So the live agent and production are unchanged, and the live prompt was not touched (no backup needed). No merge tool and no `gh` here, and nobody pushes to `main`, so all five PRs wait for a human merge.
+
+## What changed, with proof
+| Item | PR | Proof |
+|---|---|---|
+| Planner T4 (facing hides the `likely_start` guess), T5 (facing-only request gets `needs_anchor`, not HTTP 400), Arabic T1/T3, Arabic "in front of my face ... far" stays a sighting (review fix) | [#19](https://github.com/HyperionBurn/deception-dso-navigator/pull/19) | `npm test` 111/111. T1-T3 English were merged by Hussain in #18 |
+| Bridge: ROS service calls called `future.result(timeout=...)`, which rclpy does not have, so focus, volume, barge-in stop, LEDs and emoji all failed silently. Now the organisers' call pattern. Late reply from an earlier try no longer wakes the next try (review fix). Mic (raw + VAD) and playback paths tested end to end with fakes. Line-by-line diff: `robot/bridge/ORGANISER_BRIDGE_DIFF.md` | [#20](https://github.com/HyperionBurn/deception-dso-navigator/pull/20) | bridge tests 87 pass, 2 skipped; 6 new tests fail on the old code |
+| One question, one photo and fill-in survey lines for meeting room, conference room, call booths 1-4 and the robot start: `qa/MISSING PLACES.md`. Map unchanged: `evidence/floor/` shows none of these places | [#21](https://github.com/HyperionBurn/deception-dso-navigator/pull/21) | `npm test` 105/105, `map:check` 0 rejected |
+| `research_fact` answers 12 event questions (times, jury, prizes, robot, WiFi, who to ask, HADI) from the organiser guides, page cited, before the hosted researcher | [#22](https://github.com/HyperionBurn/deception-dso-navigator/pull/22) | `npm test` 108/108; test proves no bundled voice-kit fact is taken over |
+| Take scripts (easy, music, change), three slides, 100 words (exactly 100), jury cues with false claims removed (printed signs, "every leg walked", LEDs) | [#23](https://github.com/HyperionBurn/deception-dso-navigator/pull/23) | docs only; `npm test` 105/105 |
+
+Innovations (judge screen, camera arrival): not built tonight. Latency numbers already exist: the bridge writes `latency-*.csv` and logs `LATENCY:` median/worst at the end of a take (untested on the robot).
+Old branches `feat/agent-nav`, `feat/bridge-core`, `feat/bridge-raw-mic`, `feat/browser-session-id`, `feat/nav-core`, `feat/second-screen` belong to PRs #2-#7, which Hussain closed; their work was redone on `main`. Safe to delete; I did not.
+
+## Still unproven
+- Nothing ran on the robot, real ROS 2 or `aimdk_msgs`.
+- Live drill and voice smoke after #19 and #22 (need the ElevenLabs key; the last live result is `evidence/live-runs/drill7.txt` 28/28, before tonight).
+- #19 and #22 change the route tool and research API: after merging, redeploy (`npx vercel --prod --yes`) so production matches `main`, then run both live tests.
+- Every leg in `qa/survey.txt` comes from video and has not been walked.
+
+## Robot slot checklist
+1. `git pull` on `main` after #20 is merged; copy `robot/bridge/` to `/home/agi` in the MangoBot container (never inside `aimdk*`).
+2. Run the bridge exactly as `CONNECT_TO_ROBOT.md` says; one long-lived process.
+3. Log shows `FOCUS: request -> focus_gain=True`. If `False` or unavailable, playback may be muted: tell MangoBot.
+4. Say "hello" 1 m from the head; check the agent hears you (transcript line in the log) and the robot speaks.
+5. Talk over the agent; check it stops speaking (barge-in).
+6. Play music near the robot; check one request still gets the right destination.
+7. Walk Take 1 with the operator; note any leg that does not match the floor and stop filming if one fails.
+8. Copy the `latency-*.csv` and the log off the robot for the slides.
+
+## Questions only a person on the floor can answer
+1. Where does the robot start, and which way does it face? (photo from behind the robot)
+2. Which room is the meeting room? Point at its door from the purple pillar. (photo)
+3. Which room is the conference room? Is it the pitch room? (photo)
+4. Where are call booths 1-4, and which number is which? (one photo showing all four)
+5. Walk every leg in `qa/survey.txt` forward and back; does each one end at the named landmark?
+6. Which destination will the organisers pick for the change take?
+
+Exact survey lines to fill: `qa/MISSING PLACES.md` (after #21 is merged).
+
+---
+
 # Handoff for the next AI agent
 
 Written 24 Nov 2026, about 23:00 Dubai time, by the agent that worked with Wasif all evening.
