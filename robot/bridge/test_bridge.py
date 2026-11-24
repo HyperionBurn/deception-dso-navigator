@@ -811,3 +811,11 @@ class JudgeScreenTests(unittest.TestCase):
             self.assertIn('Operator, turn left.', urllib.request.urlopen(local, timeout=5).read().decode('utf-8'))
         finally:
             screen.close()
+
+    def test_bad_port_warns_and_bridge_goes_on(self):
+        bridge = make_bridge(judge_screen=65536)
+        logs = []
+        bridge.log = logs.append
+        bridge._start_judge()
+        self.assertIsNone(bridge.judge)
+        self.assertTrue(any(line.startswith('WARN: judge screen not started') for line in logs))

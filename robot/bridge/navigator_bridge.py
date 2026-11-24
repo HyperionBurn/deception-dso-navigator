@@ -1351,6 +1351,15 @@ class Bridge:
         return session_url(self.session_mode, self.site, self.code,
                            self.agent_id, self.api_key, log=self.log)
 
+    def _start_judge(self):
+        if self.judge_port is None:
+            return
+        try:
+            self.judge = JudgeScreen(self, self.judge_port)
+            self.log(f'STATE: judge screen on http://127.0.0.1:{self.judge.port}/')
+        except (OSError, OverflowError) as error:
+            self.log(f'WARN: judge screen not started: {error}')
+
     def run(self):
         need_code = self.session_mode == 'site' or \
             (self.session_mode == 'auto' and not self.api_key)
@@ -1367,12 +1376,7 @@ class Bridge:
             except Exception as error:
                 self.log(f'ERROR: {self.io.name} IO failed to start: {error}')
                 return 2
-        if self.judge_port is not None:
-            try:
-                self.judge = JudgeScreen(self, self.judge_port)
-                self.log(f'STATE: judge screen on http://127.0.0.1:{self.judge.port}/')
-            except OSError as error:
-                self.log(f'WARN: judge screen not started: {error}')
+        self._start_judge()
         sender = threading.Thread(target=self._mic_sender, daemon=True)
         player = threading.Thread(target=self._playback_worker, daemon=True)
         keys = threading.Thread(target=self._key_reader, daemon=True)
