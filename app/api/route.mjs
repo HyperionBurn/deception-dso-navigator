@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { FLOOR_MAP } from '../lib/floor-map.mjs';
+import { REHEARSAL_MAP } from '../lib/rehearsal-map.mjs';
 import { planRoute, validFacing, validHeading, validId, validObservedLandmark } from '../lib/route-planner.mjs';
 
 const MAX_BODY_BYTES = 2048;
@@ -68,6 +69,7 @@ export default {
       return json({ error: 'Invalid route request.' }, 400);
     }
     if (!validBody(body)) return json({ error: 'Invalid route request.' }, 400);
-    return json(planRoute(FLOOR_MAP, body));
+    const map = process.env.NAVIGATOR_MAP_VARIANT === 'rehearsal' ? REHEARSAL_MAP : FLOOR_MAP;
+    return json(planRoute(map, body));
   },
 };

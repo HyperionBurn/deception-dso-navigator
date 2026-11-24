@@ -23,6 +23,7 @@ import threading
 import time
 import urllib.request
 from array import array
+from types import SimpleNamespace
 
 RATE = 16000
 FORMAT = 'pcm_16000'
@@ -40,6 +41,25 @@ PKG_NAME = 'deception_navigator'
 FOCUS_PRIORITY = 6
 SILENCE = b'\x00' * CHUNK_BYTES
 DEFAULT_SITE = 'https://deception-dso-navigator.vercel.app'
+
+# --- "I'm listening" signals -------------------------------------------------
+# Phase -> (SetPmuLed mode, r, g, b) + PlayEmoji emotion_id.
+# LED modes: 0 steady, 1 breathing, 2 blinking, 3 flowing.
+# Emoji ids per the interface doc's emotion_id table.
+USER_SPEAK_SECONDS = 1.5
+THINK_SECONDS = 6.0
+TOUCH_DEBOUNCE_SECONDS = 2.0
+SIGNAL_PRIORITY = 6   # below system fault emojis/LEDs so safety preempts us
+PHASE_SIGNALS = {
+    'connecting':    {'led': (3, 255, 170, 0),   'emoji': 50},   # flowing amber, open eyes
+    'listening':     {'led': (0, 0, 200, 80),    'emoji': 10},   # steady cyan, calm
+    'user_speaking': {'led': (3, 0, 255, 0),     'emoji': 50},   # flowing green, open eyes
+    'thinking':      {'led': (1, 255, 160, 0),   'emoji': 170},  # breathing amber, thinking
+    'speaking':      {'led': (0, 120, 0, 255),   'emoji': 90},   # steady violet, happy
+    'reconnecting':  {'led': (2, 255, 60, 0),    'emoji': 130},  # blinking orange, confused
+    'error':         {'led': (0, 255, 0, 0),     'emoji': 110},  # steady red, sad
+    'stopped':       {'led': (1, 30, 30, 30),    'emoji': 80},   # breathing dim, sleeping
+}
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +138,40 @@ class PlaybackClock:
         self._end = 0.0
 
 
+class Debouncer:
+    """True at most once per `seconds` window (monotonic clock)."""
+
+    def __init__(self, seconds):
+        self.seconds = seconds
+        self._last = float('-inf')
+
+    def ready(self, now=None):
+        now = time.monotonic() if now is None else now
+        if now - self._last < self.seconds:
+            return False
+        self._last = now
+        return True
+
+
+def phase_for(state, now=None):
+    """Conversation phase for the signal table. `state` needs: error,
+    reconnecting, negotiated, speaking, last_user_at (monotonic or 0)."""
+    now = time.monotonic() if now is None else now
+    if state.error:
+        return 'error'
+    if state.reconnecting:
+        return 'reconnecting'
+    if not state.negotiated:
+        return 'connecting'
+    if state.speaking:
+        return 'speaking'
+    if state.last_user_at and now - state.last_user_at < USER_SPEAK_SECONDS:
+        return 'user_speaking'
+    if state.last_user_at and now - state.last_user_at < THINK_SECONDS:
+        return 'thinking'
+    return 'listening'
+
+
 def build_reconnect_text(transcripts):
     """Transcript memory injected after an unexpected socket drop."""
     lines = [f'{role}: {text}' for role, text in transcripts]
@@ -171,6 +225,9 @@ class NullIO:
     def stop_playback(self):
         pass
 
+    def set_phase(self, phase):
+        pass
+
     def close(self):
         self._stop.set()
 
@@ -210,6 +267,9 @@ class LaptopIO:
         if self._output and self._output.active:
             self._output.abort()
 
+    def set_phase(self, phase):
+        pass
+
     def close(self):
         for stream in (self._input, self._output):
             try:
@@ -231,12 +291,23 @@ class RobotIO:
     ABANDON_SRV = '/aimdk_5Fmsgs/srv/AbandonAudioFocus'
     STOP_SRV = '/aimdk_5Fmsgs/srv/StopAudioPlay'
     VOLUME_SRV = '/aimdk_5Fmsgs/srv/SetVolume'
+    LED_SRV = '/aimdk_5Fmsgs/srv/SetPmuLed'
+    EMOJI_SRV = '/aimdk_5Fmsgs/srv/PlayEmoji'
+    TOUCH_TOPIC = '/aima/hal/sensor/touch_head'
 
-    def __init__(self, bridge, mic='raw', mic_channel=None, volume=None):
+    def __init__(self, bridge, mic='raw', mic_channel=None, volume=None,
+                 signals=True, touch=True):
         self._bridge = bridge
         self._mic_mode = mic
         self._mic_channel = mic_channel
         self._volume = volume
+        self._signals = signals
+        self._touch = touch
+        self._touch_debounce = Debouncer(TOUCH_DEBOUNCE_SECONDS)
+        self._phase = None
+        self._led_client = None
+        self._emoji_client = None
+        self._warned = set()
         self._node = None
         self._executor = None
         self._spin_thread = None
@@ -253,12 +324,15 @@ class RobotIO:
         from rclpy.qos import (QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile,
                                QoSReliabilityPolicy)
         from aimdk_msgs.msg import (AudioCapture, AudioPlayback,
-                                    PlayStateChange, ProcessedAudioOutput)
-        from aimdk_msgs.srv import (AbandonAudioFocus, RequestAudioFocus,
-                                    SetVolume, StopAudioPlay)
+                                    PlayStateChange, ProcessedAudioOutput,
+                                    TouchState)
+        from aimdk_msgs.srv import (AbandonAudioFocus, PlayEmoji, RequestAudioFocus,
+                                    SetPmuLed, SetVolume, StopAudioPlay)
         self._msg = dict(AudioPlayback=AudioPlayback)
         self._srv = dict(focus=RequestAudioFocus, abandon=AbandonAudioFocus,
-                         stop=StopAudioPlay, volume=SetVolume)
+                         stop=StopAudioPlay, volume=SetVolume,
+                         led=SetPmuLed, emoji=PlayEmoji)
+        self._TouchState = TouchState
         self._rclpy = rclpy
 
         if not rclpy.ok():
@@ -300,14 +374,24 @@ class RobotIO:
         self._volume_client = self._node.create_client(
             SetVolume, self.VOLUME_SRV)
 
+        if self._touch:
+            self._node.create_subscription(
+                TouchState, self.TOUCH_TOPIC, self._on_touch, 10)
+        if self._signals:
+            self._led_client = self._node.create_client(SetPmuLed, self.LED_SRV)
+            self._emoji_client = self._node.create_client(PlayEmoji, self.EMOJI_SRV)
+
         if self._volume is not None:
             self._set_volume(self._volume)
         self._request_focus()
 
-    def _call(self, client, request, tries=8, timeout=0.25):
+    def _call(self, client, request, tries=8, timeout=0.25, stamp_obj=None):
         """call_async + result wait with retries; ROS cross-host services are
-        flaky per the vendor docs."""
+        flaky per the vendor docs. `stamp_obj` (a std_msgs Header) gets a fresh
+        stamp before each attempt, like the vendor examples do."""
         for _ in range(tries):
+            if stamp_obj is not None:
+                stamp_obj.stamp = self._node.get_clock().now().to_msg()
             future = client.call_async(request)
             try:
                 return future.result(timeout=timeout)
@@ -345,6 +429,69 @@ class RobotIO:
             self._call(self._volume_client, request, tries=2)
         except Exception as error:
             self._bridge.log(f'VOLUME: set failed: {error}')
+
+    # --- "I'm listening" signals (all best-effort, never blocks audio) ---------
+
+    def _warn_once(self, key, text):
+        if key not in self._warned:
+            self._warned.add(key)
+            self._bridge.log(text)
+
+    def set_phase(self, phase):
+        if not self._signals or phase == self._phase or phase not in PHASE_SIGNALS:
+            return
+        self._phase = phase
+        threading.Thread(target=self._emit_signals, args=(phase,),
+                         daemon=True).start()
+
+    def _emit_signals(self, phase):
+        led, emoji = PHASE_SIGNALS[phase]['led'], PHASE_SIGNALS[phase]['emoji']
+        if phase != self._phase:
+            return  # a newer phase already superseded this emission
+        try:
+            self._set_led(*led)
+        except Exception as error:
+            self._warn_once('led', f'LED: signal failed ({error}); continuing without it')
+        try:
+            self._play_emoji(emoji)
+        except Exception as error:
+            self._warn_once('emoji', f'EMOJI: signal failed ({error}); continuing without it')
+
+    def _set_led(self, mode, r, g, b):
+        if self._led_client is None:
+            return
+        request = self._srv['led'].Request()
+        request.led_strip_mode = mode
+        request.r, request.g, request.b = r, g, b
+        request.priority = SIGNAL_PRIORITY
+        request.reset_priority = False   # never force-preempt system fault LEDs
+        request.trace_id = 'navigator_bridge'
+        # The LED strip is slow to respond (up to ~5 s per the docs).
+        response = self._call(self._led_client, request, tries=2, timeout=5.0,
+                              stamp_obj=request.request.header)
+        if response is None:
+            self._warn_once('led', 'LED: SetPmuLed unavailable; continuing without it')
+        elif getattr(response, 'status_code', 0) == 0x1024:
+            self._warn_once('led-prio', 'LED: priority insufficient; a higher-priority source owns the strip')
+
+    def _play_emoji(self, emotion_id):
+        if self._emoji_client is None:
+            return
+        request = self._srv['emoji'].Request()
+        request.emotion_id = emotion_id
+        request.mode = 2            # EMOTION_MODE_LOOP
+        request.priority = SIGNAL_PRIORITY
+        response = self._call(self._emoji_client, request, tries=2, timeout=1.0,
+                              stamp_obj=request.header.header)
+        if response is None:
+            self._warn_once('emoji', 'EMOJI: PlayEmoji unavailable; continuing without it')
+        elif not getattr(response, 'success', True):
+            self._warn_once('emoji', f'EMOJI: rejected ({response.message}); continuing without it')
+
+    def _on_touch(self, msg):
+        if msg.event_type == getattr(self._TouchState, 'TOUCH', 2) and \
+                self._touch_debounce.ready():
+            self._bridge.head_touch()
 
     def _on_play_state(self, msg):
         state = getattr(msg.state, 'value', msg.state)
@@ -435,6 +582,10 @@ class Bridge:
         self._backlog_warned = False
         self.connected = False
         self.reconnected = False
+        self.dropping = False
+        self.error_state = False
+        self.last_user_at = 0.0
+        self._phase = None
 
     # -- logging ------------------------------------------------------------
 
@@ -481,8 +632,25 @@ class Bridge:
                 except queue.Full:
                     pass
 
+    def _update_signals(self):
+        phase = phase_for(SimpleNamespace(
+            error=self.error_state,
+            reconnecting=self.dropping,
+            negotiated=self.negotiated.is_set(),
+            speaking=self.clock.active(),
+            last_user_at=self.last_user_at,
+        ))
+        if phase != self._phase:
+            self._phase = phase
+            if self.io and hasattr(self.io, 'set_phase'):
+                try:
+                    self.io.set_phase(phase)
+                except Exception:
+                    pass
+
     def _mic_sender(self):
         while not self.stop_event.is_set():
+            self._update_signals()
             try:
                 chunk = self.send_q.get(timeout=CHUNK_MS / 1000)
             except queue.Empty:
@@ -565,6 +733,7 @@ class Bridge:
             if not self.negotiated.is_set():
                 self.negotiated.set()
                 self.connected = True
+                self.dropping = False
                 self.log('STATE: listening (negotiated pcm_16000)')
                 if self.reconnected:
                     self._send({
@@ -591,6 +760,7 @@ class Bridge:
             self.log('STATE: interrupted — playback cleared')
             return
         if kind == 'user_transcript':
+            self.last_user_at = time.monotonic()
             self.transcript('VISITOR/OP',
                             (event.get('user_transcription_event') or {}).get('user_transcript'))
             return
@@ -700,7 +870,9 @@ class Bridge:
             # Unexpected drop: reconnect with transcript memory.
             self.log('CONNECTION LOST')
             self.reconnected = True
+            self.dropping = True
             if attempts >= len(RECONNECT_DELAYS):
+                self.error_state = True
                 self.log('ERROR: reconnect attempts exhausted; '
                          'press Enter for a fresh take or q to quit')
                 self.fresh_event.wait(timeout=None if not self.stop_event.is_set() else 0)
@@ -731,10 +903,19 @@ class Bridge:
                 self.muted = not self.muted
                 self.log(f'KEYS: mic {"muted" if self.muted else "live"}')
             elif line == '':
-                self.log('KEYS: fresh take')
-                self.transcripts.clear()
-                self.reconnected = False
-                self.fresh_event.set()
+                self.fresh_take('keys')
+
+    def fresh_take(self, source='keys'):
+        self.log(f'{source.upper()}: fresh take')
+        self.transcripts.clear()
+        self.reconnected = False
+        self.dropping = False
+        self.error_state = False
+        self.fresh_event.set()
+
+    def head_touch(self):
+        self.log('TOUCH: head tapped')
+        self.fresh_take('touch')
 
     # -- shutdown --------------------------------------------------------------
 
@@ -745,6 +926,11 @@ class Bridge:
         if self.io:
             try:
                 self.io.close()
+            except Exception:
+                pass
+        if self.io and hasattr(self.io, 'set_phase'):
+            try:
+                self.io.set_phase('stopped')
             except Exception:
                 pass
         self.log('bridge stopped')
@@ -769,6 +955,10 @@ def main(argv=None):
     duplex = parser.add_mutually_exclusive_group()
     duplex.add_argument('--half-duplex', dest='half_duplex', action='store_true', default=None)
     duplex.add_argument('--full-duplex', dest='half_duplex', action='store_false')
+    parser.add_argument('--no-signals', action='store_true',
+                        help='robot only: disable LED strip + screen emoji phase signals')
+    parser.add_argument('--no-touch', action='store_true',
+                        help='robot only: disable head-touch fresh take')
     parser.add_argument('--log-dir', default=os.path.join(os.path.dirname(__file__), 'logs'))
     args = parser.parse_args(argv)
 
@@ -779,7 +969,8 @@ def main(argv=None):
     args.log_file = os.path.join(args.log_dir, f'{stamp}.log')
     if args.io == 'robot':
         args.io_backend = lambda bridge: RobotIO(
-            bridge, mic=args.mic, mic_channel=args.mic_channel, volume=args.volume)
+            bridge, mic=args.mic, mic_channel=args.mic_channel, volume=args.volume,
+            signals=not args.no_signals, touch=not args.no_touch)
     else:
         args.io_backend = IOS[args.io]
 

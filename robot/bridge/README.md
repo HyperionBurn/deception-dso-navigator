@@ -29,6 +29,10 @@ python3 robot/bridge/navigator_bridge.py --mic vad
 # speaker volume 0-100 (optional, best effort)
 python3 robot/bridge/navigator_bridge.py --volume 80
 
+# robot extras, both on by default in --io robot
+python3 robot/bridge/navigator_bridge.py --no-signals   # no LED strip / face emoji
+python3 robot/bridge/navigator_bridge.py --no-touch     # no head-touch fresh take
+
 # rehearsal / backup on a laptop mic+speaker (full duplex by default)
 python robot/bridge/navigator_bridge.py --io laptop
 
@@ -52,6 +56,21 @@ python robot/bridge/navigator_bridge.py --io null
   transcript lines so the agent resumes the conversation.
 - Logs go to console and `robot/bridge/logs/<timestamp>.log`. The access code
   and signed URL are never printed.
+
+## "I'm listening" signals (robot mode)
+
+The LED strip + face screen follow the conversation phase (`PHASE_SIGNALS` in
+the code): flowing amber while connecting, steady green when listening, flowing
+green while the visitor is talking, breathing amber while thinking, steady blue
+while the agent speaks, blinking orange on reconnect, steady red on error, dim
+breathing when stopped. Emoji loops match (open eyes, calm, thinking, happy,
+confused, sad, sleeping). Both services are called with priority 6 and
+`reset_priority=false` — system fault LEDs/emojis always preempt us. A tap on
+the head touch sensor (`/aima/hal/sensor/touch_head`, 2 s debounce) starts a
+fresh take, same as `Enter`. Everything is best-effort and never blocks audio;
+`--no-signals` / `--no-touch` disable. If the LED strip seems stuck, another
+source may hold a higher priority — see troubleshooting; per the docs you can
+stop `task_manager` on PC1 (`aima em stop-app task_manager`) to keep the strip.
 
 ## `--mic vad` caveat
 

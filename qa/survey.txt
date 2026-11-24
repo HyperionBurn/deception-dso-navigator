@@ -1,0 +1,4 @@
+# Paste survey lines here — see "qa/SURVEY FORMAT.md" for the format and
+# qa/survey.example.txt for a worked EXAMPLE. Then run:
+#   npm run map:ingest -- --dry-run     # audit without writing
+#   npm run map:ingest                  # write FLOOR_MAP + audit
