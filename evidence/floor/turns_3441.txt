@@ -1,0 +1,18 @@
+IMG_3441.MOV yaw timeline (positive = turn RIGHT, clockwise from above)
+[  0.1-  0.2] STRAIGHT
+[  0.3-  1.9] TURN LEFT ~79 deg
+[  2.0-  2.6] TURN LEFT ~55 deg
+[  2.7-  4.3] TURN LEFT ~51 deg
+[  4.4-  4.9] STRAIGHT
+[  5.0-  6.6] TURN RIGHT ~35 deg
+[  6.7-  7.4] STRAIGHT
+[  7.5-  8.1] STOPPED/PANNING
+[  8.2-  9.8] TURN LEFT ~81 deg
+[  9.9- 11.2] TURN LEFT ~55 deg
+[ 11.3- 13.4] STRAIGHT
+[ 13.5- 15.2] STRAIGHT
+[ 15.3- 17.3] TURN LEFT ~6 deg
+[ 17.4- 18.6] STRAIGHT
+[ 18.7- 19.1] STRAIGHT
+[ 19.2- 21.3] TURN RIGHT ~82 deg
+[ 21.4- 22.4] TURN RIGHT ~54 deg

@@ -1,0 +1,5 @@
+Greeting: 256000 non-silent audio bytes; pcm_16000 in both directions.
+{"turn":"Arabic visitor","syntheticTranscript":["أبغى أروح غرفة الاجتماعات لو سمحت."],"replies":["عذرًا، غرفة الاجتماعات مو متاحة حاليًا. أقدر أوديك طاولات الفرق أو المطبخ."],"nonSilentReplyBytes":212480}
+{"turn":"English destination change","syntheticTranscript":["English, please. Actually, I need the kitchen instead."],"replies":["Got it. Operator, we're going to the kitchen. Are we at the pitch room door, facing reception?"],"nonSilentReplyBytes":181760}
+{"turn":"Unmapped operator anchor","syntheticTranscript":["Operator here. I am stopped at the test blue sign, facing the white door."],"replies":["Operator, I don't know that sign. Can you see the pitch room door or the purple pillar?"],"nonSilentReplyBytes":176640}
+PASS: agtvrsn_<id>: real route tool returned needs_anchor; provider stored no audio.

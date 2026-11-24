@@ -1,0 +1,702 @@
+
+
+  
+
+  
+  1.6 AgiBot X2 Sensor Overview — AimDK_X2 1.1.0 documentation
+      
+      
+      
+      
+      
+      
+
+  
+    
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+    
+    
+    
+    
+     
+
+ 
+  
+    
+      
+        
+
+          
+          
+          
+            AimDK_X2
+          
+
+  
+    
+    
+    
+  
+
+        
+              
+1  About AgiBot X2
+1.1 Product Overview
+1.1.1 X2 Ultra Edition
+1.1.2 X2 EDU
+1.1.3 X2 Ultra(new version)
+
+1.2 Robot Specifications
+1.2.1 X2 Series Parameters
+
+1.3 On-board Computer
+1.3.1 Standard Computing Units
+1.3.2 Development Computing Unit Specifications
+
+1.4 User Debug Interfaces
+1.4.1 X2 Ultra
+1.4.2 X2 Ultra(new version)
+1.4.3 X2 EDU
+
+1.5 Secondary Development Interfaces
+1.6 AgiBot X2 Sensor Overview
+1.6.1 Sensor Capabilities & FOV Diagram
+1.6.2 Sensor Specifications
+LiDAR
+RGB-D Camera
+Front Stereo RGB Camera
+Front Interaction RGB Camera
+Rear RGB Camera
+Touch Sensor
+Standalone Inertial Sensor (IMU)
+GNSS Module
+
+1.7 Joint Motion Range Description (Warranted)
+1.7.1 Arm Motion Range
+1.7.2 Leg Motion Range
+1.7.3 Head Motion Range
+1.7.4 Waist Motion Range
+
+1.8 Coordinate System
+1.8.1 URDF and Factory Calibration
+1.8.2 Factory Calibration Extrinsics
+
+2  Operation Guide
+2.1 Startup Guide
+2.1.1 Startup While Suspended (Gantry Required) (Recommended for SDK use)
+2.1.2 Startup from Supine Position (No Gantry Required)
+2.1.3 Startup from Sitting Position (No Gantry Required)
+
+2.2 Robot Mobile App Connection (Agibot Go APP)
+2.2.1 Download Links
+iOS
+Android
+Operation Steps
+
+2.3 Remote Controller Connection
+2.3.1 Operation Steps
+
+2.4 Shutdown Guide
+2.4.1 Assist the Robot to Lie Down (No Gantry Required)
+Step 1: Enter Standing Preparation Mode (Position-Control Standing)
+Step 2: Lay the Robot Down
+Step 3: Enter Zero-Torque Mode
+Step 5: Pack the Robot as Illustrated
+
+2.4.2 Shutdown from Sitting Posture (No Gantry Required)
+Step 1: Use the Controller to Make the Robot Sit
+Step 2: Enter Zero-Torque Mode
+Step 3: Power Off
+Step 4: Pack the Robot as Shown
+
+3  Get the SDK
+4  Quick Start
+4.1 Read the user guide to familiarize yourself with relevant terminology and safety precautions.
+4.2 Choose a Development Mode
+4.2.1 Use SDK Directly on the Development Computing Unit (Quick Start; X2 Ultra and X2 Ultra(new version) Only)
+4.2.2 Container-Based Development on the Development Computing Unit (Recommended; X2 Ultra and X2 Ultra(new version) Only)
+4.2.3 Host PC / Computing Pack + Cross-Device Networking
+
+4.3 Network connection
+4.3.1 X2 Ultra / X2 Ultra(new version)
+4.3.2 X2 EDU
+
+4.4 Develop in a Container
+4.4.1 Prepare the Files
+Pre-Build Check: Mirror Reachability
+Pre-Build Check: Trailing Whitespace in /etc/subgid
+Dockerfile
+run.sh
+
+4.4.2 Build the Image
+4.4.3 Start the Container
+4.4.4 Enter the Container
+4.4.5 Build and Run
+
+4.5 Before Your First Run: Build the SDK
+4.6 Run an Example Program
+4.6.1 Get the Robot’s Current State
+4.6.2 Control the Robot to Wave
+
+4.7 Code Implementation
+4.7.1 Project Overview
+4.7.2 Add the Example to the Existing SDK Workspace
+Understand the Existing Structure
+Add a New Python Example
+
+4.7.3 Write the Control Code
+Create the Robot Control Class
+Add the Main Entry Point
+Register in the Build System
+
+4.7.4 Build and Run
+Build the Project
+Run the Project
+
+4.7.5 Code Walkthrough
+Robot Control Class
+
+4.7.6 Extensions and Optimization
+Add More Actions and Interactions
+Add Parameter Configuration
+Add Error Handling
+Add More Interaction Features
+
+4.7.7 Troubleshooting
+4.7.8 Next Steps
+4.7.9 Summary
+
+5  Interface Description
+5.1 Control Module
+5.1.1 Motion Mode Switching
+Core Functions
+Motion Mode Query Service
+Motion Mode Set Service
+Programming Examples
+Safety Notes
+
+5.1.2 Locomotion Control
+Control Functions
+Locomotion Control Topic
+Programming Examples
+Safety Notes
+
+5.1.3 MC Control Signal Configuration
+Key Features
+System-Provided Input Sources
+Arbitration Workflow
+Input Source Management Services
+Programming Examples
+Notes
+
+5.1.4 Motion Control Status Query
+Motion Control Status Topic
+Status Field Description
+
+5.1.5 Upper Body Control
+Topic Interface
+Joint Index
+Usage
+Programming Examples
+
+5.1.6 Preset Motion Control
+Preset Motion Control Service
+Preset Motion State Query Service
+Priority and Interruption Mechanism for Preset Motions
+Programming Examples
+Safety Notes
+
+5.1.7 LinkCraft Actions
+About LinkCraft
+Interface Description
+Programming Examples
+
+5.1.8 End Effector Control
+Control Methods
+Low-level Control Interface
+Hand Status Topics
+Hand Type Query Service
+Programming Examples
+Safety Notes
+
+5.1.9 Joint Control
+Key Features
+Joint Control Topics
+Joint State Query Service
+Programming Examples
+Safety Notes
+
+5.2 Interaction Module
+5.2.1 Voice Control
+Key Features
+Volume Control Services
+Text-to-Speech Service
+Audio File Playback Service
+Audio Stream Playback
+MIC Audio Stream Capture Topic
+Microphone Control Service
+Programming Examples
+Safety Notes
+
+5.2.2 Screen Control
+Key Features
+Emoji Playback Status Topic
+Emoji Playback Service
+Video Playback Service
+Programming Examples
+Safety Notes
+
+5.2.3 LED Strip Control
+Key Features
+LED Strip Control Service
+LED Strip State Topic
+Programming Examples
+
+5.2.4 LinkSoul Cloud Interaction
+About LinkSoul
+Technical Architecture
+Usage Steps
+
+5.3 Fault & System Management Module
+5.3.1 Fault Handling
+Core Features
+Topic Interfaces
+Service Interfaces
+Programming Examples
+
+5.3.2 Permission Management (Coming Soon)
+5.3.3 Diagnostic Code Reference
+How to Use This Table
+Alert Level Description
+Post-processing Signal (robot_sig)
+High-Risk Fault Overview
+PDU (Drive Control Unit)
+Health Management Module
+Hardware Abstraction Layer (ECAT, EtherCAT Joint Control)
+Perception Module
+Hardware Abstraction Layer (Sensors)
+SLAM Module
+Navigation Module
+Motion Control Module
+Interaction Module
+State Management Module
+Mapping Module
+Localization Module
+Hardware Abstraction Layer (Power)
+
+5.4 Hardware Abstraction Module
+5.4.1 Sensor Interfaces
+Core Features
+Standard Sensor Messages
+IMU Topics
+Head Touch Status Topic
+Rear RGB Camera Topics
+Stereo Camera Topics
+RGB-D Camera Topics
+LiDAR Topics
+GNSS Topic
+Code Examples
+Safety Notes
+
+5.4.2 Power Management Unit (PMU)
+Core Features
+Power Management Topic
+Safety Notes
+
+5.5 Perception Module (Optional)
+5.5.1 Vision (to be enabled)
+5.5.2 SLAM (Optional)
+Map Building
+Map Retrieval
+When to Relocalize
+Obtaining Map Identifiers and Coordinates
+Programming Examples
+
+5.5.3 Navigation (Optional)
+Navigation Task Topic
+Interface Specification
+Coordinate Conversion
+Programming Examples
+
+5.5.4 Data Visualization
+Foxglove Visualization
+RSView Visualization
+RViz Visualization
+System Status, Logs, and Communication Visualization
+
+5.6 System Modes and Developer Modes
+5.6.1 Check system status
+System State Topic
+Query System Mode Service
+
+5.6.2 Migrate to Develop mode
+5.6.3 Programming example
+5.6.4 Technical Details
+5.6.5 Safety precautions
+
+6  Example Code
+6.1 Python interface usage example
+6.1.1 Developer Mode
+6.1.2 Get Robot Mode
+6.1.3 Set Robot Mode
+6.1.4 Set Robot Motion
+6.1.5 Gripper Control
+6.1.6 Dexterous Hand Control
+6.1.7 Dexterous Hand Tactile Data (T2.1 Support)
+6.1.8 Register Secondary Development Input Source
+6.1.9 Get Current Input Source
+6.1.10 Robot Locomotion Control
+6.1.11 Joint Motor Control
+Robot Joint Control Example
+
+6.1.12 Keyboard Robot Control
+6.1.13 Take Photo
+6.1.14 Camera Streaming Example Collection
+Depth Camera Data Subscription
+Stereo Camera Data Subscription
+Rear Head Monocular Camera Data Subscription
+
+6.1.15 Head Touch Sensor Data Subscription
+6.1.16 LiDAR Data Subscription
+6.1.17 IMU Data Subscription
+6.1.18 Play Video
+6.1.19 Audio File Playback
+6.1.20 TTS (Text-to-Speech)
+6.1.21 Microphone Audio Reception
+6.1.22 Raw Microphone Audio Stream Receiver
+6.1.23 Get Current Microphone
+6.1.24 Switch Microphone
+6.1.25 Raw Audio Stream Playback
+6.1.26 Emoji Control
+6.1.27 Map Building
+6.1.28 Relocalization Using a Map
+6.1.29 Retrieve a Stored Map
+6.1.30 Navigation
+6.1.31 Play LinkCraft Action
+6.1.32 Play LinkCraft Action (Multi-Robot)
+6.1.33 LED Strip Control
+6.1.34 GNSS Positioning Data Subscription
+6.1.35 Upper Body Control
+6.1.36 Subscribe to HDS Diagnostics / Query Historical Events
+
+6.2 C++ Interface Usage Example
+6.2.1 Developer Mode
+6.2.2 Get Robot Mode
+6.2.3 Set Robot Mode
+6.2.4 Set Robot Motion
+6.2.5 Gripper Control
+6.2.6 Dexterous Hand Control
+6.2.7 Dexterous Hand Tactile Data (T2.1 Support)
+6.2.8 Register Secondary Development Input Source
+6.2.9 Get Current Input Source
+6.2.10 Robot Locomotion Control
+6.2.11 Joint Motor Control
+Robot Joint Control Example
+
+6.2.12 Keyboard Robot Control
+6.2.13 Take Photo
+6.2.14 Camera Streaming Example Collection
+Depth Camera Data Subscription
+Stereo Camera Data Subscription
+Rear Head Monocular Camera Data Subscription
+
+6.2.15 Head Touch Sensor Data Subscription
+6.2.16 LiDAR Data Subscription
+6.2.17 IMU Data Subscription
+6.2.18 Play Video
+6.2.19 Audio File Playback
+6.2.20 TTS (Text-to-Speech)
+6.2.21 Microphone Audio Reception
+6.2.22 Raw Microphone Audio Stream Receiver
+6.2.23 Get Current Microphone
+6.2.24 Switch Microphone
+6.2.25 Raw Audio Stream Playback
+6.2.26 Emoji Control
+6.2.27 Map Building
+6.2.28 Relocalization Using a Map
+6.2.29 Retrieve a Stored Map
+6.2.30 Navigation
+6.2.31 Play LinkCraft Action
+6.2.32 Play LinkCraft Action (Multi-Robot)
+6.2.33 LED Strip Control
+6.2.34 GNSS Positioning Data Subscription
+6.2.35 Upper Body Control
+6.2.36 Subscribe to HDS Diagnostics / Query Historical Events
+
+7  FAQ
+8  Temporary Transitional Solutions Statement
+8.1 Disable the Built-in Interaction System and Use Your Own Voice System
+8.1.1 Steps to Temporarily Disable the Built-in Interaction System
+8.1.2 Steps to Restore the Built-in Interaction System
+
+8.2 Motion State Simplification: Some McAction state codes prior to v0.7.x are no longer supported
+
+9  Boundaries & Disclaimer for Secondary Development
+
+ Simulation and Reinforcement Learning
+X2 RL Deployment
+1 Usage Instructions
+1.1 Prerequisites
+1.2 Quick Start
+1.3 Run the RL model example
+1.4 Directory Structure
+1.5 Model Deployment
+1.6 Communication Protocol
+
+X2 Sim + MC Deployment
+1 X2 MuJoCo Motion-Control Simulation
+1.1 Contents
+1.2 Software Components
+1.3 Prerequisites
+1.4 Prepare the Software Directory
+1.5 Option 1: Local Deployment
+1.6 Option 2: Docker Deployment
+1.7 Verify Motion Control
+1.8 Stop the Environment
+1.9 Troubleshooting
+
+ Changelog
+Changelog v1.1.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v1.0.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.9.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.2
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.1
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+Other Updates
+
+ AimDK Feedback
+
+        
+      
+    
+
+    
+          
+          AimDK_X2
+      
+
+      
+        
+          
+  
+      
+          1  About AgiBot X2
+      1.6 AgiBot X2 Sensor Overview
+      
+      
+  
+  
+
+          
+           
+             
+  
+1.6 AgiBot X2 Sensor Overview
+
+1.6.1 Sensor Capabilities & FOV Diagram
+
+Version
+Sensor Suite
+Perception Capabilities
+
+X2 Ultra
+LiDARRGB-D Depth CameraFront Stereo RGB CameraFront Interaction RGB CameraRear RGB Camera
+LiDAR:a. Captures high-precision environmental data in real time;b. Rapidly detects and measures surrounding objects;c. Outputs high-resolution point clouds as a core input for environmental perception.In addition to the chest-mounted LiDAR, multiple camera types are included for richer perception, including:a. Depth camera: assists in acquiring 3D spatial information of objects;b. Stereo camera: improves 3D perception and distance estimation accuracy;c. Rear camera: covers the rear field of view to reduce perception blind spots;d. Interaction camera: supports visual recognition and response for human-robot interaction scenarios.
+
+X2 Ultra(new version)
+LiDARRGB-D Depth CameraFront Stereo RGB CameraFront Interaction RGB CameraRear RGB Camera
+The sensing configuration is identical to that of the X2 Ultra; refer to the capabilities described above.
+
+X2 EDU
+N/A
+The X2 EDU is not equipped with any perception sensors (no LiDAR, no cameras, no touch sensor, no GNSS).
+
+1.6.2 Sensor Specifications
+
+LiDAR
+
+Manufacturer
+Model
+Wavelength
+Horizontal FOV
+Vertical FOV
+
+RoboSense
+E1R
+940 nm
+120° (-60.0° to +60.0°) ±1%
+90° (-45° to +45°)
+
+RGB-D Camera
+
+Manufacturer
+Model
+Laser Wavelength
+Resolution
+Frame Rate
+Depth FOV
+Color FOV
+
+Orbbec
+Gemini335
+850nm
+Depth: up to 1280 × 800Color: up to 1920 × 1080
+Up to 60fps
+90° × 65° ± 3° @ 2m (1280 × 800)
+94° × 68° ± 3° @ 2m
+
+Front Stereo RGB Camera
+
+Manufacturer
+Model
+Resolution
+Frame Rate
+Horizontal FOV
+Vertical FOV
+
+SenYun
+SDS23NNS1
+Up to 2064H × 1552V
+Up to 40fps
+156°
+120°
+
+Front Interaction RGB Camera
+
+Manufacturer
+Model
+Resolution
+Frame Rate
+Horizontal FOV
+Vertical FOV
+
+SenYun
+SM5M12NJ
+Up to 2608 × 1960
+Up to 30 fps
+110°
+80°
+
+Rear RGB Camera
+
+Manufacturer
+Model
+Resolution
+Frame Rate
+Horizontal FOV
+Vertical FOV
+
+SenYun
+SM3S23NS
+Up to 2064H × 1552V
+Up to 30fps
+156°
+120°
+
+Note
+Some Rear Cameras are Rotated
+Due to mold adjustments, the installation orientation of some rear monocular cameras has been rotated by 90 degrees. Apply image rotation compensation if needed. The examples already detect this automatically and apply the compensation - see the C++ example and the Python example.
+
+Touch Sensor
+
+Manufacturer
+Model
+Sampling Rate
+Single click
+Double click
+Triple click
+Short press
+Long press
+Slide
+
+Awinic (Shanghai)
+AW93208GQNR
+Up to 250 kHz
+✓
+✓
+✓
+✓
+✓
+✓
+
+Standalone Inertial Sensor (IMU)
+
+Installation Location
+Manufacturer
+Model
+Type
+Rate
+
+One each at the chest and hip
+FORSENSE
+FSS-IMU16460-DM
+6DoF MEMS IMU
+Configurable up to 1kHz
+
+GNSS Module
+
+Supported Satellite Systems
+Output Frame Rate
+Included Information
+Positioning Accuracy
+
+GPS, BeiDou, GLONASS, Galileo
+1Hz
+Latitude, Longitude, Altitude
+~2.5m outdoors
+
+           
+          
+          
+         Previous
+        Next 
+    
+
+  
+
+  
+    © Copyright 2025 Shanghai AgiBot Innovation Technology Co.,Ltd. All Rights Reserved.
+  
+
+  
+	沪ICP备2023019007号-2沪公网安备31011502401815号
+
+        
+      
+    
+  
+   
+

@@ -1,0 +1,945 @@
+
+
+  
+
+  
+  5.5.3 Navigation (Optional) — AimDK_X2 1.1.0 documentation
+      
+      
+      
+      
+      
+      
+
+  
+    
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+    
+    
+    
+    
+     
+
+ 
+  
+    
+      
+        
+
+          
+          
+          
+            AimDK_X2
+          
+
+  
+    
+    
+    
+  
+
+        
+              
+1  About AgiBot X2
+1.1 Product Overview
+1.1.1 X2 Ultra Edition
+1.1.2 X2 EDU
+1.1.3 X2 Ultra(new version)
+
+1.2 Robot Specifications
+1.2.1 X2 Series Parameters
+
+1.3 On-board Computer
+1.3.1 Standard Computing Units
+1.3.2 Development Computing Unit Specifications
+
+1.4 User Debug Interfaces
+1.4.1 X2 Ultra
+1.4.2 X2 Ultra(new version)
+1.4.3 X2 EDU
+
+1.5 Secondary Development Interfaces
+1.6 AgiBot X2 Sensor Overview
+1.6.1 Sensor Capabilities & FOV Diagram
+1.6.2 Sensor Specifications
+LiDAR
+RGB-D Camera
+Front Stereo RGB Camera
+Front Interaction RGB Camera
+Rear RGB Camera
+Touch Sensor
+Standalone Inertial Sensor (IMU)
+GNSS Module
+
+1.7 Joint Motion Range Description (Warranted)
+1.7.1 Arm Motion Range
+1.7.2 Leg Motion Range
+1.7.3 Head Motion Range
+1.7.4 Waist Motion Range
+
+1.8 Coordinate System
+1.8.1 URDF and Factory Calibration
+1.8.2 Factory Calibration Extrinsics
+
+2  Operation Guide
+2.1 Startup Guide
+2.1.1 Startup While Suspended (Gantry Required) (Recommended for SDK use)
+2.1.2 Startup from Supine Position (No Gantry Required)
+2.1.3 Startup from Sitting Position (No Gantry Required)
+
+2.2 Robot Mobile App Connection (Agibot Go APP)
+2.2.1 Download Links
+iOS
+Android
+Operation Steps
+
+2.3 Remote Controller Connection
+2.3.1 Operation Steps
+
+2.4 Shutdown Guide
+2.4.1 Assist the Robot to Lie Down (No Gantry Required)
+Step 1: Enter Standing Preparation Mode (Position-Control Standing)
+Step 2: Lay the Robot Down
+Step 3: Enter Zero-Torque Mode
+Step 5: Pack the Robot as Illustrated
+
+2.4.2 Shutdown from Sitting Posture (No Gantry Required)
+Step 1: Use the Controller to Make the Robot Sit
+Step 2: Enter Zero-Torque Mode
+Step 3: Power Off
+Step 4: Pack the Robot as Shown
+
+3  Get the SDK
+4  Quick Start
+4.1 Read the user guide to familiarize yourself with relevant terminology and safety precautions.
+4.2 Choose a Development Mode
+4.2.1 Use SDK Directly on the Development Computing Unit (Quick Start; X2 Ultra and X2 Ultra(new version) Only)
+4.2.2 Container-Based Development on the Development Computing Unit (Recommended; X2 Ultra and X2 Ultra(new version) Only)
+4.2.3 Host PC / Computing Pack + Cross-Device Networking
+
+4.3 Network connection
+4.3.1 X2 Ultra / X2 Ultra(new version)
+4.3.2 X2 EDU
+
+4.4 Develop in a Container
+4.4.1 Prepare the Files
+Pre-Build Check: Mirror Reachability
+Pre-Build Check: Trailing Whitespace in /etc/subgid
+Dockerfile
+run.sh
+
+4.4.2 Build the Image
+4.4.3 Start the Container
+4.4.4 Enter the Container
+4.4.5 Build and Run
+
+4.5 Before Your First Run: Build the SDK
+4.6 Run an Example Program
+4.6.1 Get the Robot’s Current State
+4.6.2 Control the Robot to Wave
+
+4.7 Code Implementation
+4.7.1 Project Overview
+4.7.2 Add the Example to the Existing SDK Workspace
+Understand the Existing Structure
+Add a New Python Example
+
+4.7.3 Write the Control Code
+Create the Robot Control Class
+Add the Main Entry Point
+Register in the Build System
+
+4.7.4 Build and Run
+Build the Project
+Run the Project
+
+4.7.5 Code Walkthrough
+Robot Control Class
+
+4.7.6 Extensions and Optimization
+Add More Actions and Interactions
+Add Parameter Configuration
+Add Error Handling
+Add More Interaction Features
+
+4.7.7 Troubleshooting
+4.7.8 Next Steps
+4.7.9 Summary
+
+5  Interface Description
+5.1 Control Module
+5.1.1 Motion Mode Switching
+Core Functions
+Motion Mode Query Service
+Motion Mode Set Service
+Programming Examples
+Safety Notes
+
+5.1.2 Locomotion Control
+Control Functions
+Locomotion Control Topic
+Programming Examples
+Safety Notes
+
+5.1.3 MC Control Signal Configuration
+Key Features
+System-Provided Input Sources
+Arbitration Workflow
+Input Source Management Services
+Programming Examples
+Notes
+
+5.1.4 Motion Control Status Query
+Motion Control Status Topic
+Status Field Description
+
+5.1.5 Upper Body Control
+Topic Interface
+Joint Index
+Usage
+Programming Examples
+
+5.1.6 Preset Motion Control
+Preset Motion Control Service
+Preset Motion State Query Service
+Priority and Interruption Mechanism for Preset Motions
+Programming Examples
+Safety Notes
+
+5.1.7 LinkCraft Actions
+About LinkCraft
+Interface Description
+Programming Examples
+
+5.1.8 End Effector Control
+Control Methods
+Low-level Control Interface
+Hand Status Topics
+Hand Type Query Service
+Programming Examples
+Safety Notes
+
+5.1.9 Joint Control
+Key Features
+Joint Control Topics
+Joint State Query Service
+Programming Examples
+Safety Notes
+
+5.2 Interaction Module
+5.2.1 Voice Control
+Key Features
+Volume Control Services
+Text-to-Speech Service
+Audio File Playback Service
+Audio Stream Playback
+MIC Audio Stream Capture Topic
+Microphone Control Service
+Programming Examples
+Safety Notes
+
+5.2.2 Screen Control
+Key Features
+Emoji Playback Status Topic
+Emoji Playback Service
+Video Playback Service
+Programming Examples
+Safety Notes
+
+5.2.3 LED Strip Control
+Key Features
+LED Strip Control Service
+LED Strip State Topic
+Programming Examples
+
+5.2.4 LinkSoul Cloud Interaction
+About LinkSoul
+Technical Architecture
+Usage Steps
+
+5.3 Fault & System Management Module
+5.3.1 Fault Handling
+Core Features
+Topic Interfaces
+Service Interfaces
+Programming Examples
+
+5.3.2 Permission Management (Coming Soon)
+5.3.3 Diagnostic Code Reference
+How to Use This Table
+Alert Level Description
+Post-processing Signal (robot_sig)
+High-Risk Fault Overview
+PDU (Drive Control Unit)
+Health Management Module
+Hardware Abstraction Layer (ECAT, EtherCAT Joint Control)
+Perception Module
+Hardware Abstraction Layer (Sensors)
+SLAM Module
+Navigation Module
+Motion Control Module
+Interaction Module
+State Management Module
+Mapping Module
+Localization Module
+Hardware Abstraction Layer (Power)
+
+5.4 Hardware Abstraction Module
+5.4.1 Sensor Interfaces
+Core Features
+Standard Sensor Messages
+IMU Topics
+Head Touch Status Topic
+Rear RGB Camera Topics
+Stereo Camera Topics
+RGB-D Camera Topics
+LiDAR Topics
+GNSS Topic
+Code Examples
+Safety Notes
+
+5.4.2 Power Management Unit (PMU)
+Core Features
+Power Management Topic
+Safety Notes
+
+5.5 Perception Module (Optional)
+5.5.1 Vision (to be enabled)
+5.5.2 SLAM (Optional)
+Map Building
+Map Retrieval
+When to Relocalize
+Obtaining Map Identifiers and Coordinates
+Programming Examples
+
+5.5.3 Navigation (Optional)
+Navigation Task Topic
+Interface Specification
+Coordinate Conversion
+Programming Examples
+
+5.5.4 Data Visualization
+Foxglove Visualization
+RSView Visualization
+RViz Visualization
+System Status, Logs, and Communication Visualization
+
+5.6 System Modes and Developer Modes
+5.6.1 Check system status
+System State Topic
+Query System Mode Service
+
+5.6.2 Migrate to Develop mode
+5.6.3 Programming example
+5.6.4 Technical Details
+5.6.5 Safety precautions
+
+6  Example Code
+6.1 Python interface usage example
+6.1.1 Developer Mode
+6.1.2 Get Robot Mode
+6.1.3 Set Robot Mode
+6.1.4 Set Robot Motion
+6.1.5 Gripper Control
+6.1.6 Dexterous Hand Control
+6.1.7 Dexterous Hand Tactile Data (T2.1 Support)
+6.1.8 Register Secondary Development Input Source
+6.1.9 Get Current Input Source
+6.1.10 Robot Locomotion Control
+6.1.11 Joint Motor Control
+Robot Joint Control Example
+
+6.1.12 Keyboard Robot Control
+6.1.13 Take Photo
+6.1.14 Camera Streaming Example Collection
+Depth Camera Data Subscription
+Stereo Camera Data Subscription
+Rear Head Monocular Camera Data Subscription
+
+6.1.15 Head Touch Sensor Data Subscription
+6.1.16 LiDAR Data Subscription
+6.1.17 IMU Data Subscription
+6.1.18 Play Video
+6.1.19 Audio File Playback
+6.1.20 TTS (Text-to-Speech)
+6.1.21 Microphone Audio Reception
+6.1.22 Raw Microphone Audio Stream Receiver
+6.1.23 Get Current Microphone
+6.1.24 Switch Microphone
+6.1.25 Raw Audio Stream Playback
+6.1.26 Emoji Control
+6.1.27 Map Building
+6.1.28 Relocalization Using a Map
+6.1.29 Retrieve a Stored Map
+6.1.30 Navigation
+6.1.31 Play LinkCraft Action
+6.1.32 Play LinkCraft Action (Multi-Robot)
+6.1.33 LED Strip Control
+6.1.34 GNSS Positioning Data Subscription
+6.1.35 Upper Body Control
+6.1.36 Subscribe to HDS Diagnostics / Query Historical Events
+
+6.2 C++ Interface Usage Example
+6.2.1 Developer Mode
+6.2.2 Get Robot Mode
+6.2.3 Set Robot Mode
+6.2.4 Set Robot Motion
+6.2.5 Gripper Control
+6.2.6 Dexterous Hand Control
+6.2.7 Dexterous Hand Tactile Data (T2.1 Support)
+6.2.8 Register Secondary Development Input Source
+6.2.9 Get Current Input Source
+6.2.10 Robot Locomotion Control
+6.2.11 Joint Motor Control
+Robot Joint Control Example
+
+6.2.12 Keyboard Robot Control
+6.2.13 Take Photo
+6.2.14 Camera Streaming Example Collection
+Depth Camera Data Subscription
+Stereo Camera Data Subscription
+Rear Head Monocular Camera Data Subscription
+
+6.2.15 Head Touch Sensor Data Subscription
+6.2.16 LiDAR Data Subscription
+6.2.17 IMU Data Subscription
+6.2.18 Play Video
+6.2.19 Audio File Playback
+6.2.20 TTS (Text-to-Speech)
+6.2.21 Microphone Audio Reception
+6.2.22 Raw Microphone Audio Stream Receiver
+6.2.23 Get Current Microphone
+6.2.24 Switch Microphone
+6.2.25 Raw Audio Stream Playback
+6.2.26 Emoji Control
+6.2.27 Map Building
+6.2.28 Relocalization Using a Map
+6.2.29 Retrieve a Stored Map
+6.2.30 Navigation
+6.2.31 Play LinkCraft Action
+6.2.32 Play LinkCraft Action (Multi-Robot)
+6.2.33 LED Strip Control
+6.2.34 GNSS Positioning Data Subscription
+6.2.35 Upper Body Control
+6.2.36 Subscribe to HDS Diagnostics / Query Historical Events
+
+7  FAQ
+8  Temporary Transitional Solutions Statement
+8.1 Disable the Built-in Interaction System and Use Your Own Voice System
+8.1.1 Steps to Temporarily Disable the Built-in Interaction System
+8.1.2 Steps to Restore the Built-in Interaction System
+
+8.2 Motion State Simplification: Some McAction state codes prior to v0.7.x are no longer supported
+
+9  Boundaries & Disclaimer for Secondary Development
+
+ Simulation and Reinforcement Learning
+X2 RL Deployment
+1 Usage Instructions
+1.1 Prerequisites
+1.2 Quick Start
+1.3 Run the RL model example
+1.4 Directory Structure
+1.5 Model Deployment
+1.6 Communication Protocol
+
+X2 Sim + MC Deployment
+1 X2 MuJoCo Motion-Control Simulation
+1.1 Contents
+1.2 Software Components
+1.3 Prerequisites
+1.4 Prepare the Software Directory
+1.5 Option 1: Local Deployment
+1.6 Option 2: Docker Deployment
+1.7 Verify Motion Control
+1.8 Stop the Environment
+1.9 Troubleshooting
+
+ Changelog
+Changelog v1.1.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v1.0.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.9.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.2
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.1
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+
+Changelog v0.8.0
+Newly Released Features
+Adjustments to Existing Features
+Deprecated / Removed Features
+Other Updates
+
+ AimDK Feedback
+
+        
+      
+    
+
+    
+          
+          AimDK_X2
+      
+
+      
+        
+          
+  
+      
+          5  Interface Description
+          5.5 Perception Module (Optional)
+      5.5.3 Navigation (Optional)
+      
+      
+  
+  
+
+          
+           
+             
+  
+5.5.3 Navigation (Optional)
+The navigation module provides path planning and autonomous navigation interfaces, supporting robots to perform point-to-point navigation tasks within known maps, and also supports task control operations such as pause, resume, and stop.
+
+Important
+This is an optional component. To use the interfaces described on this page, please contact after-sales technical support.
+
+Navigation Task Topic
+
+Topic Name
+Data Type
+Description
+QoS
+Frequency
+
+/aima/te/pnc_task_request
+PncTaskRequest
+Publish a navigation task request (start/pause/resume/stop)
+BEST_EFFORT+VOLATILE
+User (on-demand)
+
+/aima/pnc/pnc_task_response
+PncTaskResponse
+Navigation Task Execution Result Feedback
+BEST_EFFORT+TRANSIENT_LOCAL
+Event-driven (on task state change)
+
+/task_master/state
+TaskMasterState
+Task engine status (main state, sub state, SLAM state, tour/pilot task state)
+BEST_EFFORT+TRANSIENT_LOCAL
+1Hz
+
+Prerequisites
+Before using navigation, ensure the following conditions are met:
+
+Relocalization completed: The robot has been localized in the map (triggered via the start_relocalization:<map_id> command, see SLAM)
+Working map set: The map_id in the navigation request must match the map ID used for relocalization (the relocalization process automatically loads the target map and establishes localization; if a different map_id is specified during navigation, PNC will load that map’s data but the localization frame remains on the relocalization map, causing navigation errors). map_id must be a valid, already-built map ID.
+Motion control mode is stable stand (STAND_DEFAULT) or locomotion (LOCOMOTION_DEFAULT): The robot must be in a mode that can accept locomotion velocity commands, otherwise navigation tasks will be blocked. Stable stand and locomotion mode are unified; the velocity commands sent by navigation drive automatic internal switching between the two (see Motion Mode Switching).
+
+PncTaskRequest ros2-msg @ task_engine/msg/PncTaskRequest.msg
+# Navigation task request
+# Topic name: /aima/te/pnc_task_request
+
+MessageHeader header
+
+uint8 task_type                             # Task type, see enum definition TASK_TYPE
+uint8 task_request                          # Task request, see enum definition TASK_REQUEST
+uint8 pnc_mode                              # PNC mode (0: Enable obstacle avoidance, 1: Disable obstacle avoidance)
+uint64 task_id                              # Task ID; must match the one used when starting the task when pausing/resuming/stopping
+uint64 map_id                               # Map ID
+geometry_msgs/PoseStamped target_pose       # Target pose
+geometry_msgs/Pose2D[] reference_line       # Reference line (only considers x, y); target_pose holds the target orientation (yaw)
+float64 target_pose_radius                  # Target range radius (unit: m); minimum effective value is 0.25
+float32 max_forward_speed                   # Maximum forward speed (unit: m/s, default 0.8)
+
+geometry_msgs/Pose2D[] trajectory_pos       # (reserved) group-control parameter
+geometry_msgs/Twist[] trajectory_vel        # (reserved) group-control parameter
+uint64 play_timestamp                       # (reserved) group-control parameter
+uint64 time_duration                        # (reserved) group-control parameter
+
+# 64-byte reserved field
+char[64] reserve_info
+
+Available values for task_type (defined by the TASK_TYPE enumeration):
+
+Enumeration Name
+Value
+Description
+
+TASK_TYPE_PLANNING_NAVI_TO_POSE_2D
+2
+Plan and navigate to a 2D pose
+
+Other enum values are for internal use only.
+
+Available values for task_request (defined by the TASK_REQUEST enumeration):
+
+Enumeration Name
+Value
+Description
+
+TASK_REQUEST_NONE
+0
+No request
+
+TASK_REQUEST_START
+1
+Start navigation task
+
+TASK_REQUEST_STOP
+2
+Stop navigation, clear task status
+
+TASK_REQUEST_PAUSE
+3
+Pause navigation, robot stops in place, status retained
+
+TASK_REQUEST_RESUME
+4
+Resume the paused navigation task
+
+TASK_REQUEST_STATUS_INQUIRY
+5
+Query current task status
+
+Interface Specification
+
+Start Navigation
+Set the target pose, map ID, obstacle-avoidance mode, and speed to initiate a navigation task.
+PncTaskRequest.task_type = TASK_TYPE_PLANNING_NAVI_TO_POSE_2D
+PncTaskRequest.task_request = TASK_REQUEST_START
+PncTaskRequest.task_id = xxx          // Task ID (millisecond timestamp)
+PncTaskRequest.map_id = xxxx          // Actual map ID in use
+PncTaskRequest.pnc_mode = 0           // 0: Enable obstacle avoidance, 1: Disable
+PncTaskRequest.max_forward_speed = 0.5 // Maximum forward speed (m/s)
+PncTaskRequest.target_pose = ...      // Target pose
+PncTaskRequest.target_pose_radius = 0.5 // Reach accuracy (m)
+
+Pause Navigation
+Pause the current navigation task. The robot stops in place and the task state is preserved.
+PncTaskRequest.task_type = TASK_TYPE_PLANNING_NAVI_TO_POSE_2D
+PncTaskRequest.task_request = TASK_REQUEST_PAUSE
+PncTaskRequest.task_id = xxx          // Same task ID used when starting navigation
+
+Resume Navigation
+Resume the paused navigation task; the robot continues toward the previous navigation goal.
+PncTaskRequest.task_type = TASK_TYPE_PLANNING_NAVI_TO_POSE_2D
+PncTaskRequest.task_request = TASK_REQUEST_RESUME
+PncTaskRequest.task_id = xxx          // Same task ID used when starting navigation
+
+Stop Navigation
+Stop the current navigation task and clear the task state.
+PncTaskRequest.task_type = TASK_TYPE_PLANNING_NAVI_TO_POSE_2D
+PncTaskRequest.task_request = TASK_REQUEST_STOP
+PncTaskRequest.task_id = xxx          // Same task ID used when starting navigation
+
+Reminder: map_id is a required field (see Obtaining Map Identifiers and Coordinates for how to obtain it); task_id must match the one used at the start when pausing/resuming/stopping.
+
+Get Navigation Task Execution Result
+Subscribe to the /aima/pnc/pnc_task_response topic to get the navigation
+task execution result. This topic is published only once when the task
+state changes (e.g. RUNNING/FAILED/FINISHED/PAUSED).
+
+PncTaskResponse ros2-msg @ task_engine/msg/PncTaskResponse.msg
+# Navigation task execution result
+# Topic: /aima/pnc/pnc_task_response
+
+MessageHeader header
+
+uint8 task_type                             # Task type, see TASK_TYPE enum
+uint64 task_id                              # Task ID (same as in request)
+uint64 map_id                               # Map ID
+uint8 task_status                           # Task status, see TASK_STATUS enum
+
+# 64 byte reserved
+char[64] reserve_info
+
+Available values for task_status (defined by the TASK_STATUS enumeration):
+
+Enumeration Name
+Value
+Description
+
+TASK_STATUS_UNKONW
+0
+Unknown status
+
+TASK_STATUS_RUNNING
+1
+Task running
+
+TASK_STATUS_FAILED
+2
+Task failed
+
+TASK_STATUS_PAUSED
+3
+Task paused
+
+TASK_STATUS_FINISHED
+4
+Task completed
+
+TASK_STATUS_RECOVERY_TIMEOUT
+22
+Recovery timeout
+
+Other statuses
+10-31
+See PncTaskResponse.msg definition
+
+Warning
+Navigation tasks may be automatically interrupted
+When the robot detects a serious system fault (e.g. fall, system fault),
+the navigation task may be automatically interrupted. The robot plays a
+TTS prompt: “Sorry, a system fault has been detected and autonomous
+navigation tasks cannot be performed. Please check the fault cause in the
+client app.”
+To programmatically detect whether a navigation task has been interrupted, use the following methods:
+
+Subscribe to the /aima/pnc/pnc_task_response topic and observe whether
+task_status changes to FAILED
+Subscribe to the /task_master/state topic and observe whether
+main_state changes from PILOT to IDLE
+
+Get Task Engine Status
+Subscribe to the /task_master/state topic to get the overall task engine
+status. This topic is periodically published and continuously updates
+the task engine state machine.
+
+TaskMasterState ros2-msg @ task_engine/msg/TaskMasterState.msg
+# Task engine status
+# Topic: /task_master/state
+
+uint8 main_state                          # Main state, see TM_MAIN_STATE enum
+uint8 sub_state                           # Sub state, see TM_SUB_STATE enum
+uint8 slam_state                          # SLAM state, see SLAM_STATE enum
+uint64 loc_map_id                         # Current localization map ID (valid only when slam_state=LOCALIZATION)
+string loc_map_name                       # Current localization map name (valid only when slam_state=LOCALIZATION)
+
+FixLineIntroState fix_line_intro_state    # Tour task status (valid only when main_state=FIX_LINE_INTRO)
+PilotState pilot_state                    # Pilot task status (valid only when main_state=PILOT)
+
+# Reserved information
+string reserve_info
+
+Available values for main_state (defined by the TM_MAIN_STATE enumeration):
+
+Enumeration Name
+Value
+Description
+
+TM_MAIN_STATE_IDLE
+0
+Idle
+
+TM_MAIN_STATE_RELOCALIZATION
+1
+Relocalizing
+
+TM_MAIN_STATE_MAPPING
+2
+Mapping
+
+TM_MAIN_STATE_FIX_LINE_INTRO
+3
+Tour task running
+
+TM_MAIN_STATE_RECORDING_PATH
+4
+Recording path
+
+TM_MAIN_STATE_PILOT
+5
+Pilot task running
+
+Available values for sub_state (defined by the TM_SUB_STATE enumeration):
+
+Enumeration Name
+Value
+Description
+
+TM_SUB_STATE_NONE
+0
+No sub state
+
+TM_SUB_STATE_RESUME
+1
+Long-running task active
+
+TM_SUB_STATE_PAUSE
+2
+Long-running task paused
+
+Available values for slam_state (defined by the SLAM_STATE enumeration):
+
+Enumeration Name
+Value
+Description
+
+SLAM_STATE_IDLE
+0
+SLAM idle
+
+SLAM_STATE_RELOCALIZATION
+1
+SLAM relocalizing
+
+SLAM_STATE_MAPPING
+2
+SLAM mapping
+
+SLAM_STATE_LOCALIZATION
+3
+SLAM localizing
+
+FixLineIntroState ros2-msg @ task_engine/msg/FixLineIntroState.msg
+# Tour task status
+uint8 fix_line_intro_state              # Tour task status, see TM_FIX_LINE_INTRO_STATE enum
+uint64 set_task_id                      # User-preset task ID (0 if not set)
+string set_task_name                    # User-preset task alias (empty if not set)
+string task_name                        # Task alias
+uint64 task_id                          # Task ID (generated on task creation)
+string map_name                         # Map alias (valid only when task depends on map)
+uint64 map_id                           # Map ID (generated on map creation)
+uint32 rest_site_number                 # Remaining tour sites (excluding current)
+uint64 cur_target_id                    # Current target point ID
+
+Available values for fix_line_intro_state
+(defined by the TM_FIX_LINE_INTRO_STATE enumeration):
+
+Enumeration Name
+Value
+Description
+
+TM_FIX_LINE_INTRO_STATE_NAVI_TO_NEXT_SITE
+0
+Navigate to next tour site
+
+TM_FIX_LINE_INTRO_STATE_SITE_ACTIONS
+1
+Execute current tour site action
+
+TM_FIX_LINE_INTRO_STATE_NAVI_RETURN
+2
+Navigate back to standby point
+
+TM_FIX_LINE_INTRO_STATE_NAVI_TO_TARGET_POI
+3
+Navigate to target POI
+
+TM_FIX_LINE_INTRO_STATE_POI_ACTIONS
+4
+Execute POI action
+
+TM_FIX_LINE_INTRO_STATE_STANDBY_ACTIONS
+5
+Standby action
+
+PilotState ros2-msg @ task_engine/msg/PilotState.msg
+# Pilot task status
+uint8 pilot_state                       # Pilot task status, see TM_PILOT_STATE enum
+string target_name                      # Target point alias (POI alias when navigating to POI, tour site alias when navigating to tour site)
+uint64 target_id                        # Target point ID
+string intro_task_name                  # Tour task alias (valid only when navigating to a tour site created by a tour task)
+uint64 intro_task_id                    # Tour task ID
+string map_name                         # Map alias (valid only when task depends on map)
+uint64 map_id                           # Map ID (generated on map creation)
+
+Available values for pilot_state (defined by the TM_PILOT_STATE enumeration):
+
+Enumeration Name
+Value
+Description
+
+TM_PILOT_STATE_NAVI_TO_TARGET
+0
+Navigate to target point
+
+TM_PILOT_STATE_TARGET_ACTIONS
+1
+Execute target point action
+
+TM_PILOT_STATE_NAVI_RETURN
+2
+Navigate back
+
+TM_PILOT_STATE_STANDBY_ACTIONS
+3
+Standby action
+
+Coordinate Conversion
+The target_pose used by the navigation interface is in Map world coordinates (unit: meters). If the target originates from map pixel coordinates, convert pixel coordinates to world coordinates first.
+Pixel coordinates can be obtained from the map info file at: /agibot/data/var/MapManagerModule/<map_id>/grid_map_info.txt
+This file contains three lines:
+
+Line 1: resolution (pixels per 1 meter, e.g. 20)
+Line 2: origin pixel coordinates of the map (origin.u, origin.v of the mapping origin)
+Line 3: image width and height (in pixels)
+
+Pixel → world coordinate conversion formula:
+x = (pixel_u - origin_u) / resolution
+y = -(pixel_v - origin_v) / resolution
+
+Here resolution is from line 1, and origin_u/origin_v are from line 2. The resulting (x, y) can be used as target_pose.pose.position.
+
+Programming Examples
+Refer to the following detailed programming examples and code explanations:
+
+Python example (navigation): Navigation
+C++ example (navigation): Navigation
+
+Caution
+As standard ROS DO NOT handle cross-host service (request-response) well, please refer to SDK examples to use open interfaces in a robust way (with protection mechanisms e.g. exception safety and retransmission)
+While the robot is in Stable Standing Mode or Locomotion Mode, DO NOT launch ROS nodes in rapid bulk (no more than 2 nodes per second is recommended), as a large number of nodes joining DDS discovery within a short period causes communication congestion and degrades motion control real-time performance, which may cause the robot to lose balance and fall
+
+           
+          
+          
+         Previous
+        Next 
+    
+
+  
+
+  
+    © Copyright 2025 Shanghai AgiBot Innovation Technology Co.,Ltd. All Rights Reserved.
+  
+
+  
+	沪ICP备2023019007号-2沪公网安备31011502401815号
+
+        
+      
+    
+  
+   
+

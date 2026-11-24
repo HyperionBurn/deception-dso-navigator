@@ -1,0 +1,417 @@
+VOICE OF THE OASIS
+
+HACKATHON
+
+ TEAM GUIDE
+
+Everything your team needs for the 24 hours: schedule,
+challenges, rules, robot slots, submission and pitching.
+
+24H        3           12                  2              ROBOTS
+
+HACKATHON  CHALLENGES  TEAMS               HUMANOID
+
+DTEC � DUBAI SILICON OASIS 24-25 NOV 2026
+                                                         VOICE OF THE OASIS � TEAM GUIDE
+
+THE 24 HOURS
+
+DOORS OPEN  KICK-OFF   CODE FREEZE PITCHES               WINNERS                     MAIN STAGE
+
+Tue 10:00   Tue 11:00  Wed 08:30 Wed 08:45 Wed 10:45 Wed 13:00
+
+TUESDAY 24 NOV                                    WEDNESDAY 25 NOV
+
+10:00       Doors open, badges, coffee, credits   06:00  Robot test round 2 and demo filming
+            on Discord                            07:15  Pitching workshop
+11:00       Welcome and the three challenges      07:30  Breakfast. Pitch practice
+11:15       ElevenLabs: getting started           08:30  Code freeze. Submissions close
+11:50       Robot demo: what the robots can       08:45  Pitches to the jury
+            and cannot do                         10:45  Winners announced
+12:00       Building starts                       11:00  Winners rehearse on the robots
+13:00       Lunch. Robot orientation for robot    13:00  Winners on the Doers Summit main
+            teams                                        stage
+15:00       Mentors at your table: technical and
+            product                               YOUR ORGANISERS
+17:00       Checkpoint: one sentence on your
+            demo                                           Adam urica
+18:00       Robot test round 1
+19:00       Dinner                                          Zero One Hundred
+20:00       Check-ins with Adam, Seruga and
+            Mat�s                                        Adam Seruga
+22:00       Quiet hours, coffee stays on
+23:00       Late-night food                              RoboHours � PhysicalAiData
+
+                                                         Krist�na Moncekov�
+
+                                                         The Doers Company
+
+                                                         Mat�s Chud�k
+
+                                                         The Doers Company
+
+YOUR FIRST HOUR                                   BRING
+
+Redeem your ElevenLabs credits (page              Laptop, charger, headphones with a
+4) and read your challenge brief (pages           microphone and a photo ID for building
+6 to 8). Robot teams: read page 5 before          security. Food, coffee and internet are
+your orientation slot.                            on us. WiFi details at registration.
+
+24-25 NOV 2026 � DTEC, DUBAI SILICON OASIS � ALL TIMES DUBAI TIME                    2 / 9
+                                                VOICE OF THE OASIS � TEAM GUIDE
+
+CHALLENGES AND RULES
+
+01                        02                    03
+
+AI Voice Navigator        Soft Landing Guide    HALA Concierge
+
+RUNS ON HUMANOID ROBOT A  SOFTWARE ONLY         RUNS ON HUMANOID ROBOT B
+
+Full brief on page 6      Full brief on page 7  Full brief on page 8
+
+WHAT EVERY AGENT MUST DO
+
+   People talk to it and it answers out loud, in real time.
+
+   It works in English and Arabic. A third language is a bonus.
+
+   It tells people they are talking to an AI and says when it does not know something. Made-up
+   answers cost points.
+
+   Bookings and other actions go into your own mock calendar or form, and the demo shows
+   them going through.
+
+RULES
+
+   Build your agent on ElevenLabs Agents.
+   Use the facts in your challenge brief. If you need more, make them up and mark them as
+   demo data.
+   Teams have 3 to 5 people. What you build belongs to you.
+   Navigator and HALA teams put their agent on a humanoid robot. You build the voice,
+   MangoBot handles all movement.
+
+ROBOT SLOTS
+
+Slot Robot A � Navigator  Robot B � HALA        Orientation Round 1  Round 2
+
+1 Deception               Team Kanban           Tue 13:00 Tue 18:00  Wed 07:30
+2 The Ghost Protocol      JDM Tech              Tue 13:15 Tue 18:30  Wed 07:00
+3 Hercules                Denenis Lab           Tue 13:30 Tue 19:00  Wed 06:30
+4 Navigator solos team    HALA solos team       Tue 13:45 Tue 19:30  Wed 06:00
+
+One team at a robot at a time. If you miss your slot, it is gone. In round 2 you film your demo. Page 5
+explains how to connect your agent.
+
+24-25 NOV 2026 � DTEC, DUBAI SILICON OASIS � ALL TIMES DUBAI TIME    3 / 9
+                                                   VOICE OF THE OASIS � TEAM GUIDE
+
+ELEVENLABS YOUR TOOLKIT
+
+ElevenLabs is the technology partner of Voice of the Oasis. Every agent runs on ElevenLabs
+Agents. It handles listening, turn-taking and the voice, so your time goes into what the agent
+knows and does.
+
+Agents                        Knowledge                       Tools
+
+Listening, turn-taking,       Load the facts from your brief  Let the agent call your mock
+interruptions and the voice.  as the agent's knowledge base.  booking backend.
+Start here.
+
+YOUR CREDITS � ONE MONTH OF THE CREATOR TIER
+
+1 Join the ElevenLabs Discord: discord.com/invite/VnBvbbcdEC
+2 Open the coupon-codes channel and press Start Redemption.
+3 Pick this event and enter the email you registered with.
+4 The bot sends you a unique code. Redeem it in your ElevenLabs account.
+5 Stuck? The redemption walkthrough: youtu.be/S143_JtCtV8
+
+Status on Monday night: ElevenLabs has our participant list and is loading the codes. Try tonight. If
+the bot does not know your email, start on the free tier and tell us at registration. Registered by your
+team lead? Reply to the guide email with your address.
+
+BEFORE YOU START                                   ELEVENLABS ON SITE
+
+    Read the ElevenLabs Hacker Guide tonight.      Tue 11:15  Getting started session with George
+                                                   Tue 15:00  Shayeb, ElevenLabs.
+    Set up Arabic and English from the start and              George Shayeb and Ali Ottoman,
+    test both.                                                ElevenLabs, at your table until 17:00.
+                                                              Any time: moderators in their
+    Robot teams: audio in and out as PCM 16 kHz               Discord.
+    (page 5).
+
+    Keep your API key out of your code and public
+    repos.
+
+    Note your workspace ID. ElevenLabs may ask
+    for it.
+
+PRIZES BY ELEVENLABS
+
+Challenge winners  Each member of the three winning teams: 3 months of the Pro tier, worth USD 297,
+                   with 600k credits a month.
+Best ElevenLabs    Each member of the team with the best use of ElevenLabs: 3 months of the Scale
+build              tier, worth USD 897, with 1.8M credits a month.
+
+24-25 NOV 2026 � DTEC, DUBAI SILICON OASIS � ALL TIMES DUBAI TIME      4 / 9
+                                                       VOICE OF THE OASIS � TEAM GUIDE
+
+YOUR AGENT ON THE ROBOT
+
+Two AgiBot X2 Ultra humanoids from MangoBot. Your ElevenLabs agent becomes the robot's
+voice, and MangoBot controls all movement.
+
+HOW IT WORKS             The bridge                    ElevenLabs Agent         Robot speaker
+
+ Robot mic               elevenlabs_robot_             WebSocket                /aima/hal/audio/
+                         bridge.py                     pcm_16000 in and out     playback
+   /agent/               ROS 2, Python
+   process_audio_output
+   16 kHz � 16-bit �
+   mono
+
+GET IT TALKING
+
+1 � Agent Set your agent's input and output audio to PCM 16000 Hz. Public agent: ID only. Private: add an API key.
+2 � Code elevenlabs_robot_bridge.py from the guide email: listens, sends, speaks, stops when interrupted.
+3 � Robot MangoBot switches the robot to voice-only mode and opens a container for you on PC2.
+4 � Run The four commands below. The engineer tells you the AimDK path.
+5 � Talk Say the robot's wake word once (MangoBot tells you which), then talk normally.
+
+pip3 install websocket-client numpy          <aimdk>/install/setup.bash
+source /opt/ros/humble/setup.bash && source  and ELEVENLABS_API_KEY if private
+export ELEVENLABS_AGENT_ID=your_agent_id #
+python3 elevenlabs_robot_bridge.py
+
+IF SOMETHING GOES WRONG                                WHERE YOUR CODE GOES
+
+It interrupts  Run with HALF_DUPLEX=1 . The mic        The bridge only moves audio. Your knowledge,
+itself         mutes while the robot speaks.           tools and Arabic belong in the ElevenLabs agent.
+Speaker stays                                          To react in code, edit on_user_text ,
+silent         Set the agent's output audio to PCM     on_agent_text or on_tool_call at the bottom
+No connection  16000 Hz.                               of the class.
+
+Loud room      No internet in the container. Tell the  The bridge follows AgiBot's X2 docs but has not
+               engineer.                               run on these robots yet. The first orientation slot
+                                                       tests it.
+               Ask the engineer for the external mic.
+
+ROBOT RULES � FROM MANGOBOT AND AGIBOT
+
+   Docs: x2-aimdk.agibot.com, v1.1.0 (shown as latest). SDK v1.0.0, URDF X2_URDF-v1.3.0. Read the Quick
+   Start and section 9 before orientation.
+   Run code only in a container, as a plugin or separate process. Never on PC1 (<address removed>).
+   Do not touch the OS, drivers, DDS or algorithm configs, firmware, power or hardware. No factory reset.
+   At most 2 ROS nodes per second. Save only under /home/agi, never in aimdk*. Back up your code on your
+   laptop.
+   If anything looks wrong, stop and call the MangoBot engineer.
+
+24-25 NOV 2026 � DTEC, DUBAI SILICON OASIS � ALL TIMES DUBAI TIME                       5 / 9
+                                                                      VOICE OF THE OASIS � TEAM GUIDE
+
+01 AI VOICE NAVIGATOR
+
+HUMANOID ROBOT A  4 TEAMS  PITCHES 09:13 TO 09:40
+
+Dubai Silicon Oasis puts offices, campuses, homes and malls side by side. A first-time
+visitor has to work out the building, the entrance and the floor, usually by asking
+whoever is nearby.
+
+WHO YOU BUILD FOR                                      MUST HAVE
+
+Visitors, new hires and summit guests standing in a        Directions a person can actually follow
+lobby in front of the robot. Many speak Arabic first,      A clarifying question when the request is
+and some switch language mid-sentence.                     vague
+                                                           A language switch mid-conversation
+A WINNING DEMO                                             Short answers first, details only when asked
+
+  A guest tells the robot in Arabic that she has a     STRETCH
+  meeting at Oraseya Capital at three and wants
+  to pray first. The agent sends her to the first          Today's Doers Summit agenda as a source
+  floor of Dtec TechnoHub 1, points her to DSO             The route sent to the visitor's phone
+  Masjid in the Techno Point building and, when            Remembering the visitor within the session
+  she switches to English, offers to send the route
+  to her phone.
+
+FACTS YOU CAN BUILD ON                                                                                 DSO
+                                                                                                     DTEC
+Dtec has two campuses: TechnoHub 1, and building A5 in Dubai Digital Park.                     LISTING
+Dtec office hours 07:30 to 15:00; members have 24/7 access.                                    LISTING
+Oraseya Capital's office is on the first floor of Dtec TechnoHub 1.
+Silicon Central Mall, 08:00 to 00:00: Friends Avenue Cafe on the ground floor, Emirates NBD    LISTING
+on the first.                                                                                  LISTING
+Open 24 hours: Union Coop Silicon Oasis, Souq Extra, and Life Pharmacy in Palace Towers.       LISTING
+Prayer: DSO Masjid, Techno Point building, free parking. Al Waha Masjid, 04:00 to 23:00.     RESEARCH
+Clinics: Burjeel Medical Center DSO and Life Medical Centre, both daily 07:00 to 23:00.
+Bus routes 50, 320, 365, 366 and X25 serve DSO.
+
+WHERE THE PUBLIC DATA STOPS                                           OUT OF SCOPE
+
+Nothing is published about entrances, reception floors, prayer        Robot movement. The robot stands
+rooms, toilets or lifts inside Dtec, or about walking times. Collect  still and talks, and MangoBot controls
+them on Tuesday or mark them as demo data. Opening hours              all movement.
+come from Google.
+
+24-25 NOV 2026 � DTEC, DUBAI SILICON OASIS � ALL TIMES DUBAI TIME                            6 / 9
+                                                             VOICE OF THE OASIS � TEAM GUIDE
+
+02 SOFT LANDING GUIDE
+
+SOFTWARE ONLY  WEB OR PHONE  4 TEAMS                  PITCHES 08:45 TO 09:12
+
+A founder abroad wants to open a company in Dubai Silicon Oasis. The facts exist, but
+they are spread across DSO pages, Dtec pages, agency blogs and the press, and
+some of them contradict each other.
+
+WHO YOU BUILD FOR                                     MUST HAVE
+
+A founder or a team of two or three outside the UAE,      Questions before advice: sector, team size,
+comparing DSO with other free zones, usually in a         visas, budget
+short call.                                               A plain explanation of the setup route that fits
+                                                          A checklist built for this founder
+A WINNING DEMO                                            A booked call with a human adviser
+
+  A two-person SaaS team calls from Lagos and         STRETCH
+  wants two visas. The agent asks what they do
+  and where they are, suggests an FZCO with a             A written summary sent after the call
+  Dtec flexi desk, says which figures a person            Two setup options compared side by side
+  must confirm, reads back a document checklist           The founder's own language beyond English
+  and books a call with the Dtec team.                    and Arabic
+
+FACTS YOU CAN BUILD ON                                                                                             DSO
+                                                                                                                   DSO
+New companies register as an FZCO; existing ones open a Branch. DSO's setup page also                              DSO
+lists FZE and the Business Operation Permit.                                                      DSO AGENCY
+                                                                                                                   DSO
+Steps: DSOA portal application, fees and documents, e-lease and bank share capital letter,                  AGENCY
+pre-approval with activity and security checks, digital lease, e-licence.                                          DSO
+
+Documents: letter of intent, passports, NOC for UAE residents, bank statement or reference
+letter, application form, business plan, UBO declaration.
+
+Time: DSO states 7 days for the application and 2 days from complete documents to
+licence. Agencies quote 2 to 4 weeks.
+
+Visas: up to 2 with a flexi desk, up to 3 with a fixed desk, 2 per desk in a furnished office of
+12 to 50 m�.
+
+Agency quotes per year: flexi desk about AED 18,000 (36 hours a month), fixed desk about
+AED 24,000, furnished office from AED 47,820.
+
+Human handover: DSO on 600 59 55 57, Monday to Friday 08:00 to 15:00.
+
+WHERE THE PUBLIC DATA STOPS                                  OUT OF SCOPE
+
+Minimum capital: DSO's setup page says AED 100,000, but the  Legal or tax advice presented as final.
+2023 DIEZ regulations reportedly set AED 1. Sources also     The agent says a human adviser
+disagree on whether setup can be done remotely. The agent    confirms the details.
+should say so and hand over to a person.
+
+24-25 NOV 2026 � DTEC, DUBAI SILICON OASIS � ALL TIMES DUBAI TIME                                 7 / 9
+                                                               VOICE OF THE OASIS � TEAM GUIDE
+
+03 HALA CONCIERGE
+
+HUMANOID ROBOT B  4 TEAMS  PITCHES 09:41 TO 10:08
+
+DSO already runs over 340 services online and a text chatbot. What it does not have is
+a voice a resident or a company can simply talk to, in Arabic or English, that knows
+which service applies and books the next step.
+
+WHO YOU BUILD FOR                                     MUST HAVE
+
+HR and PRO staff at DSO companies, and residents,         At least five services handled end to end
+at the HALA reception or on the phone.                    The details a booking needs: name, date,
+                                                          contact
+A WINNING DEMO                                            A spoken confirmation
+                                                          A clean handover to a person when out of
+  An HR manager asks in Arabic to renew an                scope
+  employee's visa, then switches to English to ask
+  about an access card. The agent identifies both     STRETCH
+  services, lists the documents, books a slot in the
+  mock calendar, confirms by voice, and hands             Rescheduling and cancelling
+  over to a person when the caller disputes a fee.        A follow-up message
+                                                          Calm handling of an impatient caller
+                                                          The same agent on a phone line
+
+FACTS YOU CAN BUILD ON                                                                           DSO PRESS
+                                                                                                                DSO
+Hala is DSO's initiative that turned its Customer Happiness Center into a reception suite
+guiding members to digital services. Launched in 2018.                                                      PRESS
+                                                                                                            PRESS
+DSO's portal offers over 340 digital services, with e-wallet payments and service kiosks.  DSO RESEARCH
+                                                                                                     RESEARCH
+A 24-hour e-wallet deposit machine stands in the DSO HQ building.
+
+HADI, DSO's AI text chatbot, covered 226 smart services by 2020, when DSOA reported
+95% of its services digitised.
+Contact: 600 59 55 57, Monday to Friday 08:00 to 15:00. Email hello@dso.ae; some DSO
+pages show business@dso.com.
+Services to model: employment visa (new, renewal, cancellation), establishment card,
+licence renewal and amendment, NOCs, access and ID cards, leasing, maintenance
+requests, complaints.
+
+WHERE THE PUBLIC DATA STOPS                                    OUT OF SCOPE
+
+The service catalogue, fees and processing times sit behind    Real DSO accounts, payments and
+DSO's member login. Build a demo catalogue with the services   personal data of real residents. Robot
+above, mark every fee and time as a demo value, and say so in  movement, which MangoBot controls.
+your pitch.
+
+24-25 NOV 2026 � DTEC, DUBAI SILICON OASIS � ALL TIMES DUBAI TIME                          8 / 9
+                                                           VOICE OF THE OASIS � TEAM GUIDE
+
+SUBMIT AND PITCH
+
+PITCH ORDER, WED 25 NOV
+
+Time   Team                  Challenge               SUBMIT BY WED 08:30
+08:45
+08:52  Oasis Whisperers      Soft Landing Guide    One form: project link, 100 words,
+08:59  SYNQ AI               Soft Landing Guide    demo video, up to 3 slides. Robot
+09:06  Cookie Army           Soft Landing Guide    teams add one unedited take on the
+09:13  Oasislabs             Soft Landing Guide    robot, max 2 minutes. Late
+09:20  Navigator solos team  AI Voice Navigator    submissions are not judged.
+09:27  Hercules              AI Voice Navigator
+09:34  The Ghost Protocol    AI Voice Navigator      YOUR 7 MINUTES
+09:41  Deception             AI Voice Navigator
+09:48  HALA solos team       HALA Concierge        3 min pitch, 2 min demo, 2 min
+09:55  Denenis Lab           HALA Concierge        questions. Demo live on phone or
+10:02  JDM Tech              HALA Concierge        laptop, or play your robot video.
+       Team Kanban           HALA Concierge
+                                                 A PITCH THAT WORKS
+Final order on screen Wednesday 08:30.
+                                                    The problem and who has it
+                                                    The demo
+                                                    Why it matters for DSO
+                                                    What comes next
+
+HOW THE JURY SCORES: 1 TO 5, WEIGHTED
+
+       Criterion                                                               Weight
+
+01 Working demo. Does it actually work, live or on video?                      25%
+
+02 Technical quality and use of ElevenLabs. Sound build, real platform depth.  20%
+
+03 Voice experience. Natural, fast, multilingual, hands over to a human.       20%
+
+04 Challenge fit and business feasibility. Does it solve the brief, and could DSO run it? 15%
+
+05 Pitch and storytelling. Clear problem, clear user, clear next step.         10%
+
+06 Investment feasibility. Could this become a company worth backing?          10%
+
+The jury: Abdelkarim Deesi (Dubai Future Foundation), George Shayeb (ElevenLabs), Krzysztof Szczurek
+(Nucleus Robotics), Brandon Moses (Panthera Robotics), Adam Seruga (RoboHours, PhysicalAiData), Ali
+
+Shaheen (Palgu).
+
+PRIZES BY ELEVENLABS                             MENTORS AND HELP
+
+Pro package for each challenge winner, Scale     Mentors come to your table Tue 15:00-17:00.
+package for the best ElevenLabs build.           Adam, Seruga and Mat�s go round every team
+                                                 Tue 20:00-22:00.
+
+24-25 NOV 2026 � DTEC, DUBAI SILICON OASIS � ALL TIMES DUBAI TIME              9 / 9
+
