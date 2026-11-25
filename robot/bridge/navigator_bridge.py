@@ -21,6 +21,7 @@ import json
 import os
 import queue
 import select
+import socket
 import struct
 import sys
 import threading
@@ -508,6 +509,13 @@ def build_reconnect_text(transcripts):
             'question: is the robot still at the last landmark you named? '
             'Then continue with the route tool. Otherwise carry on from the '
             'last thing that was said.')
+
+
+# The venue uplink has a 1492-byte path MTU; full 1500-byte segments from the
+# agent server can be lost and the server then drops the socket mid-reply.
+# A smaller MSS keeps every segment under it (Linux only; ignored elsewhere).
+SMALL_MSS = (((socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1300),)
+             if sys.platform.startswith('linux') else ())
 
 
 def socket_readable(ws, wait=0.5):
@@ -1263,6 +1271,9 @@ class Bridge:
 
         self.ws = None
         self._ws_lock = threading.Lock()
+        # One TLS operation at a time: OpenSSL must not read and write the
+        # same connection from two threads (mic sends vs. big audio reads).
+        self._io_lock = threading.RLock()
         self.negotiated = threading.Event()
         self.stop_event = threading.Event()
         self.fresh_event = threading.Event()
@@ -1421,7 +1432,8 @@ class Bridge:
         if ws is None:
             return False
         try:
-            ws.send(json.dumps(message))
+            with self._io_lock:
+                ws.send(json.dumps(message))
             return True
         except Exception as error:
             self.log(f'SEND: failed ({type(error).__name__}: {error}); '
@@ -1531,19 +1543,22 @@ class Bridge:
         import websocket
         ws = websocket.create_connection(
             url, subprotocols=['convai'], timeout=SOCKET_TIMEOUT,
-            skip_utf8_validation=True, enable_multithread=True)
+            skip_utf8_validation=True, enable_multithread=True,
+            sockopt=SMALL_MSS)
         with self._ws_lock:
             self.ws = ws
         self.log('STATE: socket open')
         try:
-            ws.send(json.dumps({'type': 'conversation_initiation_client_data'}))
+            with self._io_lock:
+                ws.send(json.dumps({'type': 'conversation_initiation_client_data'}))
         except Exception:
             return
         while not self.stop_event.is_set() and not self.fresh_event.is_set():
             try:
                 if not socket_readable(ws):
                     continue
-                raw = ws.recv()
+                with self._io_lock:
+                    raw = ws.recv()
             except Exception as error:
                 name = type(error).__name__
                 if 'timeout' in name.lower():
@@ -1999,7 +2014,8 @@ def _preflight_socket(url, check):
         ws = websocket.create_connection(url, subprotocols=['convai'],
                                          timeout=SOCKET_TIMEOUT,
                                          skip_utf8_validation=True,
-                                         enable_multithread=True)
+                                         enable_multithread=True,
+                                         sockopt=SMALL_MSS)
     except Exception as error:
         check('agent websocket', False, f'connect: {error}')
         return
