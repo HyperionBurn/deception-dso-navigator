@@ -20,6 +20,7 @@ import http.server
 import json
 import os
 import queue
+import select
 import struct
 import sys
 import threading
@@ -497,9 +498,28 @@ def build_reconnect_text(transcripts):
     """Transcript memory injected after an unexpected socket drop."""
     lines = [f'{role}: {text}' for role, text in transcripts]
     history = ' / '.join(lines[-TRANSCRIPT_LINES:]) or '(nothing yet)'
-    return ('Reconnected after a network drop. Conversation so far: ' + history +
-            ' Continue from where it stopped; ask the operator to confirm '
-            "the robot's position before any new step.")
+    return ('Reconnected after a short network drop. Do not greet again and '
+            'do not ask where the visitor wants to go if a destination was '
+            'already confirmed. Conversation so far: ' + history +
+            ' If a route was under way, ask the operator one yes/no '
+            'question: is the robot still at the last landmark you named? '
+            'Then continue with the route tool. Otherwise carry on from the '
+            'last thing that was said.')
+
+
+def socket_readable(ws, wait=0.5):
+    """True when recv() will not block: decrypted bytes pending or the socket is readable."""
+    sock = getattr(ws, 'sock', None)
+    if sock is None:
+        return True          # fakes in tests: recv() does its own waiting
+    pending = getattr(sock, 'pending', None)
+    if callable(pending) and pending():
+        return True
+    try:
+        ready, _, _ = select.select([sock], [], [], wait)
+    except (OSError, ValueError):
+        return True          # closed socket: let recv() report it
+    return bool(ready)
 
 
 def request_signed_url(site, code, opener=None):
@@ -553,6 +573,85 @@ def session_url(session, site, code, agent_id, api_key, log=lambda *a: None):
             raise
         log('SESSION: site path failed; using direct ElevenLabs')
         return direct_signed_url(agent_id, api_key)
+
+
+# --camera-look: front camera candidates in preference order. Frames are
+# grabbed on demand only — never a live raw-image subscription.
+LOOK_TOPICS = (
+    '/aima/hal/sensor/rgbd_head_front/rgb_image/compressed',
+    '/aima/hal/sensor/rgb_head_front_center/rgb_image/compressed',
+    '/aima/hal/sensor/rgb_head_front_center/rgb_image',
+    '/aima/hal/sensor/rgbd_head_front/rgb_image',
+)
+LOOK_INTERVAL = 10.0
+LOOK_MIN_GAP = 4.0
+LOOK_GRAB_TIMEOUT = 2.0
+LOOK_POST_TIMEOUT = 15.0
+LOOK_MAX_SIDE = 640
+
+
+def choose_look_topic(names, override=None):
+    """names = {topic: reported type}. Returns (topic, 'CompressedImage'|
+    'Image') for the first present candidate, else (None, None)."""
+    candidates = [override] if override else LOOK_TOPICS
+    for topic in candidates:
+        if topic not in names:
+            continue
+        kind = names[topic]
+        if kind == 'sensor_msgs/msg/CompressedImage':
+            return topic, 'CompressedImage'
+        if kind == 'sensor_msgs/msg/Image':
+            return topic, 'Image'
+        return None, None
+    return None, None
+
+
+def post_locate(site, code, image_b64, timeout=LOOK_POST_TIMEOUT):
+    """POST one JPEG to /api/locate with the same access code as /api/session."""
+    request = urllib.request.Request(
+        f'{site}/api/locate',
+        data=json.dumps({'image': image_b64}).encode('utf-8'),
+        headers={'content-type': 'application/json', 'x-access-code': code},
+        method='POST')
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read().decode('utf-8'))
+
+
+def frame_to_jpeg(msg):
+    """One camera msg -> JPEG bytes, longest side <= 640, or None."""
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return None
+    try:
+        if hasattr(msg, 'encoding'):
+            channels = {'rgb8': 3, 'bgr8': 3, 'mono8': 1}.get(msg.encoding)
+            if channels is None:
+                return None
+            buf = np.frombuffer(bytes(msg.data), np.uint8)
+            if buf.size < msg.step * msg.height:
+                return None
+            rows = buf[:msg.step * msg.height].reshape(msg.height, msg.step)
+            frame = rows[:, :msg.width * channels]
+            frame = (frame.reshape(msg.height, msg.width) if channels == 1
+                     else frame.reshape(msg.height, msg.width, channels))
+            if msg.encoding == 'rgb8':
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        else:
+            frame = cv2.imdecode(
+                np.frombuffer(bytes(msg.data), np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            return None
+        height, width = frame.shape[:2]
+        scale = LOOK_MAX_SIDE / max(height, width)
+        if scale < 1:
+            frame = cv2.resize(frame, (int(width * scale), int(height * scale)))
+        ok, jpeg = cv2.imencode(
+            '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        return jpeg.tobytes() if ok else None
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -658,7 +757,8 @@ class RobotIO:
     CAMERA_MIN_INTERVAL = 0.25         # decode at most 4 fps
 
     def __init__(self, bridge, mic='vad', mic_channel=None, mic_stream=0,
-                 volume=None, signals=True, touch=True, camera_markers=False):
+                 volume=None, signals=True, touch=True, camera_markers=False,
+                 camera_look=False, camera_topic=None):
         self._bridge = bridge
         self._mic_mode = mic
         self._mic_channel = mic_channel
@@ -673,6 +773,10 @@ class RobotIO:
         self._signals = signals
         self._touch = touch
         self._camera_markers = camera_markers
+        self._camera_look = camera_look
+        self._camera_topic_override = camera_topic
+        self._camera_topic = None
+        self._camera_type = None
         self._cam_last = 0.0
         self._cv2 = None
         self._aruco = None
@@ -754,6 +858,8 @@ class RobotIO:
         if self._signals:
             self._led_client = self._client(SetPmuLed, self.LED_SRV)
             self._emoji_client = self._client(PlayEmoji, self.EMOJI_SRV)
+        if self._camera_look:
+            self._choose_camera()
 
         if self._volume is not None:
             self._set_volume(self._volume)
@@ -1024,6 +1130,55 @@ class RobotIO:
             self._bridge.send_contextual(
                 f'Camera: {marker_name(seen)} is visible {where}{dist}.')
 
+    # --- camera look (on-demand frames for /api/locate) ----------------------
+
+    def _choose_camera(self, timeout=3.0):
+        """Pick the front camera topic from the live graph; frames are only
+        ever grabbed one at a time, never subscribed continuously."""
+        deadline = time.monotonic() + timeout
+        names = {}
+        while time.monotonic() < deadline:
+            try:
+                names = {n: t[0] for n, t in
+                         self._node.get_topic_names_and_types()}
+            except Exception:
+                names = {}
+            if names:
+                break
+            time.sleep(0.2)
+        topic, kind = choose_look_topic(names, self._camera_topic_override)
+        if topic is None:
+            self._bridge.log('CAMERA: no front camera topic found; look off')
+            self._camera_look = False
+            return
+        self._camera_topic, self._camera_type = topic, kind
+        self._bridge.log(f'CAMERA: look on {topic} ({kind})')
+
+    def grab_frame(self, timeout=LOOK_GRAB_TIMEOUT):
+        """One-shot frame: subscribe, wait for a message, destroy the
+        subscription. A raw-image subscription is never kept alive."""
+        if not self._camera_look or not self._camera_topic:
+            return None
+        from rclpy.qos import (QoSHistoryPolicy, QoSProfile,
+                               QoSReliabilityPolicy)
+        from sensor_msgs.msg import CompressedImage, Image
+        cls = CompressedImage if self._camera_type == 'CompressedImage' else Image
+        got, done = {}, threading.Event()
+
+        def on_msg(msg):
+            got['msg'] = msg
+            done.set()
+
+        qos = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST, depth=1,
+                         reliability=QoSReliabilityPolicy.BEST_EFFORT)
+        sub = self._node.create_subscription(
+            cls, guard_ros_name(self._camera_topic), on_msg, qos)
+        try:
+            done.wait(timeout)
+        finally:
+            self._node.destroy_subscription(sub)
+        return got.get('msg')
+
     def play(self, chunk):
         playback = self._msg['AudioPlayback']()
         playback.pkg_name = self._pkg
@@ -1108,6 +1263,25 @@ class Bridge:
         self._backlog_warned = False
         self.connected = False
         self.reconnected = False
+        self._greeting = None
+        self._mute_greeting = False
+        self.camera_look = bool(getattr(args, 'camera_look', False))
+        if self.camera_look:
+            if not isinstance(self.io, RobotIO):
+                self.log('CAMERA: look needs the robot IO; off')
+                self.camera_look = False
+            elif self.session_mode == 'direct' or not self.code:
+                self.log('CAMERA: look needs the site access code; off')
+                self.camera_look = False
+        self._look_due = threading.Event()
+        self._look_clock = getattr(args, 'look_clock', None) or time.monotonic
+        self._look_grab = getattr(args, 'look_grab', None)
+        self._look_post = getattr(args, 'look_post', None)
+        self._last_look = float('-inf')
+        self._look_last_note = None
+        self._look_operator_asked = False
+        self._look_failures = set()
+        self._look_frame_warned = False
         self.dropping = False
         self.error_state = False
         self.last_user_at = 0.0
@@ -1242,7 +1416,10 @@ class Bridge:
         try:
             ws.send(json.dumps(message))
             return True
-        except Exception:
+        except Exception as error:
+            self.log(f'SEND: failed ({type(error).__name__}: {error}); '
+                     'closing socket')
+            self._close_ws()
             return False
 
     def send_contextual(self, text):
@@ -1276,6 +1453,8 @@ class Bridge:
                 self._send({'type': 'pong', 'event_id': event_id})
             return
         if kind == 'audio':
+            if self._mute_greeting:
+                return
             audio = event.get('audio_event') or {}
             payload = audio.get('audio_base_64')
             if self.negotiated.is_set() and isinstance(payload, str) and payload:
@@ -1291,6 +1470,7 @@ class Bridge:
             self.log('STATE: interrupted — playback cleared')
             return
         if kind == 'user_transcript':
+            self._mute_greeting = False
             self.last_user_at = time.monotonic()
             self._stall.note_transcript()
             self.latency.note_transcript()
@@ -1298,8 +1478,20 @@ class Bridge:
                             (event.get('user_transcription_event') or {}).get('user_transcript'))
             return
         if kind == 'agent_response':
-            self.transcript('AGENT',
-                            (event.get('agent_response_event') or {}).get('agent_response'))
+            text = (event.get('agent_response_event') or {}).get('agent_response')
+            if isinstance(text, str):
+                if self._greeting is None:
+                    self._greeting = text
+                if (self._mute_greeting and
+                        text.strip() == self._greeting.strip()):
+                    self.log('STATE: repeat greeting muted')
+                    return
+                self._mute_greeting = False
+            if isinstance(text, str) and 'Operator,' in text:
+                self._look_operator_asked = True
+                if '?' in text:
+                    self._look_due.set()
+            self.transcript('AGENT', text)
             return
         if kind == 'agent_response_correction':
             text = (event.get('agent_response_correction_event') or {}).get('corrected_agent_response')
@@ -1334,7 +1526,6 @@ class Bridge:
         ws = websocket.create_connection(
             url, subprotocols=['convai'], timeout=SOCKET_TIMEOUT,
             skip_utf8_validation=True)
-        ws.settimeout(0.5)
         with self._ws_lock:
             self.ws = ws
         self.log('STATE: socket open')
@@ -1344,12 +1535,14 @@ class Bridge:
             return
         while not self.stop_event.is_set() and not self.fresh_event.is_set():
             try:
+                if not socket_readable(ws):
+                    continue
                 raw = ws.recv()
             except Exception as error:
                 name = type(error).__name__
                 if 'timeout' in name.lower():
                     continue
-                self.log(f'STATE: socket error ({name})')
+                self.log(f'STATE: socket error ({name}: {error})')
                 break
             if not raw:
                 break
@@ -1363,6 +1556,64 @@ class Bridge:
                 self.log(f'PROTOCOL: event handling error: {error}')
         self._close_ws()
         self.connected = False
+
+    # -- camera look ----------------------------------------------------------
+
+    def _look_loop(self):
+        while not self.stop_event.is_set():
+            self._look_due.wait(timeout=LOOK_INTERVAL)
+            self._look_due.clear()
+            self._maybe_look()
+
+    def _maybe_look(self):
+        if not self.negotiated.is_set():
+            return False
+        now = self._look_clock()
+        if now - self._last_look < LOOK_MIN_GAP:
+            return False
+        self._last_look = now
+        self._do_look()
+        return True
+
+    def _do_look(self):
+        try:
+            msg = self._look_grab()
+        except Exception as error:
+            self._log_look_failure('grab', error)
+            return
+        jpeg = frame_to_jpeg(msg) if msg is not None else None
+        if jpeg is None:
+            if not self._look_frame_warned:
+                self._look_frame_warned = True
+                self.log('CAMERA: look frame unusable (encoding or decode)')
+            return
+        try:
+            result = self._look_post(base64.b64encode(jpeg).decode('ascii'))
+        except Exception as error:
+            self._log_look_failure('post', error)
+            return
+        result = result if isinstance(result, dict) else {}
+        landmark = result.get('landmark')
+        facing = result.get('facing')
+        ms = result.get('ms')
+        self.log(f'CAMERA: look -> {landmark or "nothing"}'
+                 f'{", facing " + facing if facing else ""}'
+                 f'{f" ({ms} ms)" if ms is not None else ""}')
+        if not landmark:
+            return
+        text = (f'Camera: the robot seems to be at {landmark}, '
+                f'facing {facing}.' if facing else
+                f'Camera: the robot seems to be at {landmark}.')
+        if text != self._look_last_note or self._look_operator_asked:
+            if self.send_contextual(text):
+                self._look_last_note = text
+                self._look_operator_asked = False
+
+    def _log_look_failure(self, kind, error):
+        name = f'{kind}:{type(error).__name__}'
+        if name not in self._look_failures:
+            self._look_failures.add(name)
+            self.log(f'CAMERA: look failed ({name}: {error})')
 
     def _session_url(self):
         return session_url(self.session_mode, self.site, self.code,
@@ -1400,6 +1651,14 @@ class Bridge:
         sender.start()
         player.start()
         keys.start()
+        if self.camera_look:
+            if self._look_grab is None:
+                self._look_grab = lambda: self.io.grab_frame()
+            if self._look_post is None:
+                self._look_post = lambda image: post_locate(
+                    self.site, self.code, image)
+            threading.Thread(target=self._look_loop, daemon=True).start()
+            self.log('CAMERA: look loop started')
 
         attempts = 0
         while not self.stop_event.is_set():
@@ -1422,6 +1681,7 @@ class Bridge:
             # Unexpected drop: reconnect with transcript memory.
             self.log('CONNECTION LOST')
             self.reconnected = True
+            self._mute_greeting = True
             self.dropping = True
             self.phrases.play('lost_en', 'lost_ar')
             if attempts >= len(RECONNECT_DELAYS):
@@ -1463,6 +1723,7 @@ class Bridge:
         self.log(f'{source.upper()}: fresh take')
         self.transcripts.clear()
         self.reconnected = False
+        self._mute_greeting = False
         self.dropping = False
         self.error_state = False
         self._stall.reset()
@@ -1798,6 +2059,11 @@ def main(argv=None):
                         help='read-only ArUco marker sightings on the RGB-D '
                              'front camera, sent to the agent as '
                              'contextual_update (needs cv2 in the container)')
+    parser.add_argument('--camera-look', action='store_true',
+                        help='periodic camera frames to /api/locate for '
+                             'position notes (robot IO only, on-demand grabs)')
+    parser.add_argument('--camera-topic', default=None,
+                        help='override the --camera-look front camera topic')
     parser.add_argument('--judge-screen', type=int, default=None, metavar='PORT',
                         help='off by default: read-only transcript page on 127.0.0.1:PORT')
     parser.add_argument('--no-touch', action='store_true',
@@ -1819,7 +2085,8 @@ def main(argv=None):
             bridge, mic=args.mic, mic_channel=args.mic_channel,
             mic_stream=args.mic_stream, volume=args.volume,
             signals=not args.no_signals, touch=not args.no_touch,
-            camera_markers=args.camera_markers)
+            camera_markers=args.camera_markers,
+            camera_look=args.camera_look, camera_topic=args.camera_topic)
     else:
         args.io_backend = IOS[args.io]
 

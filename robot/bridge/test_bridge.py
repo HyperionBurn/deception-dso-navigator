@@ -247,7 +247,9 @@ class ReconnectTextTests(unittest.TestCase):
         text = nb.build_reconnect_text([('VISITOR/OP', 'booth'), ('AGENT', 'go north')])
         self.assertIn('VISITOR/OP: booth', text)
         self.assertIn('AGENT: go north', text)
-        self.assertIn('position', text)
+        self.assertIn('Do not greet again', text)
+        self.assertIn('route tool', text)
+        self.assertNotIn("confirm the robot's position before any new step", text)
 
 
 class SignedUrlTests(unittest.TestCase):
@@ -739,6 +741,8 @@ except ImportError:
     cv2 = np = None
     HAS_ARUCO = False
 
+HAS_CV2 = cv2 is not None
+
 
 class MarkerObservationTests(unittest.TestCase):
     def square(self, cx, cy, side):
@@ -1079,3 +1083,445 @@ class PlaybackPathTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+import socket as _socket
+
+
+class SocketReadableTests(unittest.TestCase):
+    def test_no_sock_attr_returns_true(self):
+        self.assertTrue(nb.socket_readable(FakeWS(), wait=0.01))
+
+    def test_pending_bytes_returns_true(self):
+        ws = types.SimpleNamespace(
+            sock=types.SimpleNamespace(pending=lambda: 1))
+        self.assertTrue(nb.socket_readable(ws, wait=0.01))
+
+    def test_idle_socket_blocks_then_reports_readable(self):
+        left, right = _socket.socketpair()
+        try:
+            ws = types.SimpleNamespace(sock=left)
+            self.assertFalse(nb.socket_readable(ws, wait=0.05))
+            right.send(b'x')
+            self.assertTrue(nb.socket_readable(ws, wait=0.5))
+        finally:
+            left.close()
+            right.close()
+
+    def test_closed_socket_returns_true(self):
+        sock = _socket.socket()
+        sock.close()
+        ws = types.SimpleNamespace(sock=sock)
+        self.assertTrue(nb.socket_readable(ws, wait=0.01))
+
+
+class RunSocketTimeoutTests(unittest.TestCase):
+    def test_no_short_settimeout_on_the_socket(self):
+        bridge = make_bridge()
+        bridge.ws = None
+
+        class TimeoutWS(FakeWS):
+            def __init__(self):
+                super().__init__()
+                self.timeouts = []
+
+            def settimeout(self, value):
+                self.timeouts.append(value)
+
+            def recv(self):
+                return ''
+
+        ws = TimeoutWS()
+        fake_module = types.SimpleNamespace(
+            create_connection=lambda *a, **k: ws)
+        with mock.patch.dict(sys.modules, {'websocket': fake_module}):
+            bridge._run_socket('wss://example.invalid')
+        self.assertEqual(ws.timeouts, [])
+        self.assertTrue(ws.closed)
+        self.assertIsNone(bridge.ws)
+
+
+class SendFailureTests(unittest.TestCase):
+    def test_failed_send_logs_and_closes(self):
+        logs = []
+        bridge = make_bridge()
+        bridge.log = logs.append
+
+        class DeadWS(FakeWS):
+            def send(self, raw):
+                raise OSError('broken pipe')
+
+        bridge.ws = ws = DeadWS()
+        self.assertFalse(bridge._send({'type': 'pong', 'event_id': 1}))
+        self.assertTrue(ws.closed)
+        self.assertIsNone(bridge.ws)
+        self.assertTrue(any('SEND: failed' in line and 'OSError' in line
+                            for line in logs))
+
+    def test_send_without_socket_is_silent_false(self):
+        logs = []
+        bridge = make_bridge()
+        bridge.log = logs.append
+        bridge.ws = None
+        self.assertFalse(bridge._send({'type': 'pong'}))
+        self.assertFalse(any('SEND: failed' in line for line in logs))
+
+
+class GreetingMuteTests(unittest.TestCase):
+    def audio(self, payload=b'\x01\x02'):
+        return {'type': 'audio',
+                'audio_event': {'audio_base_64': base64.b64encode(payload).decode()}}
+
+    def response(self, text):
+        return {'type': 'agent_response',
+                'agent_response_event': {'agent_response': text}}
+
+    def test_first_greeting_stored_and_audio_queued(self):
+        bridge = make_bridge()
+        bridge.on_event(METADATA)
+        bridge.on_event(self.response('Ahlan! How can I help?'))
+        self.assertEqual(bridge._greeting, 'Ahlan! How can I help?')
+        self.assertEqual(list(bridge.transcripts),
+                         [('AGENT', 'Ahlan! How can I help?')])
+        bridge.on_event(self.audio())
+        self.assertEqual(bridge.play_q.qsize(), 1)
+
+    def test_repeat_greeting_muted_after_drop(self):
+        logs = []
+        bridge = make_bridge()
+        bridge.log = logs.append
+        bridge.on_event(METADATA)
+        bridge.on_event(self.response('Ahlan! How can I help?'))
+        bridge.on_event(self.audio())
+        bridge.play_q.get()
+        # Simulate the unexpected drop path.
+        bridge.reconnected = True
+        bridge._mute_greeting = True
+        bridge.on_event(self.response('  Ahlan! How can I help? '))
+        self.assertEqual(len(bridge.transcripts), 1)
+        self.assertTrue(any('repeat greeting muted' in line for line in logs))
+        bridge.on_event(self.audio())
+        self.assertTrue(bridge.play_q.empty())
+
+    def test_user_transcript_unmutes(self):
+        bridge = make_bridge()
+        bridge.on_event(METADATA)
+        bridge.on_event(self.response('Ahlan! How can I help?'))
+        bridge._mute_greeting = True
+        bridge.on_event({'type': 'user_transcript',
+                         'user_transcription_event': {'user_transcript': 'hi'}})
+        self.assertFalse(bridge._mute_greeting)
+        bridge.on_event(self.audio())
+        self.assertEqual(bridge.play_q.qsize(), 1)
+
+    def test_different_response_unmutes(self):
+        bridge = make_bridge()
+        bridge.on_event(METADATA)
+        bridge.on_event(self.response('Ahlan! How can I help?'))
+        bridge._mute_greeting = True
+        bridge.on_event(self.response('Operator, which way are we facing?'))
+        self.assertFalse(bridge._mute_greeting)
+        self.assertEqual(bridge.transcripts[-1],
+                         ('AGENT', 'Operator, which way are we facing?'))
+
+    def test_fresh_take_unmutes(self):
+        bridge = make_bridge()
+        bridge._mute_greeting = True
+        bridge.fresh_take('test')
+        self.assertFalse(bridge._mute_greeting)
+
+
+class ChooseLookTopicTests(unittest.TestCase):
+    T1 = '/aima/hal/sensor/rgbd_head_front/rgb_image/compressed'
+    T2 = '/aima/hal/sensor/rgb_head_front_center/rgb_image/compressed'
+    T3 = '/aima/hal/sensor/rgb_head_front_center/rgb_image'
+    T4 = '/aima/hal/sensor/rgbd_head_front/rgb_image'
+
+    def test_first_present_wins(self):
+        names = {self.T3: 'sensor_msgs/msg/Image',
+                 self.T1: 'sensor_msgs/msg/CompressedImage'}
+        self.assertEqual(nb.choose_look_topic(names),
+                         (self.T1, 'CompressedImage'))
+
+    def test_falls_through_to_later_candidate(self):
+        names = {self.T3: 'sensor_msgs/msg/Image'}
+        self.assertEqual(nb.choose_look_topic(names), (self.T3, 'Image'))
+
+    def test_override_replaces_candidate_list(self):
+        custom = '/custom/rgb'
+        names = {self.T1: 'sensor_msgs/msg/CompressedImage',
+                 custom: 'sensor_msgs/msg/Image'}
+        self.assertEqual(nb.choose_look_topic(names, custom),
+                         (custom, 'Image'))
+
+    def test_none_present(self):
+        self.assertEqual(nb.choose_look_topic({}), (None, None))
+
+    def test_override_absent_disables(self):
+        self.assertEqual(
+            nb.choose_look_topic({self.T1: 'sensor_msgs/msg/Image'},
+                                 '/missing'), (None, None))
+
+    def test_unsupported_type_disables_even_with_later_match(self):
+        names = {self.T1: 'std_msgs/msg/String',
+                 self.T3: 'sensor_msgs/msg/Image'}
+        self.assertEqual(nb.choose_look_topic(names), (None, None))
+
+    def test_unknown_type_disables(self):
+        names = {self.T4: 'sensor_msgs/msg/PointCloud2'}
+        self.assertEqual(nb.choose_look_topic(names), (None, None))
+
+
+class LookTopicPickTests(unittest.TestCase):
+    """RobotIO._choose_camera against a fake ROS graph (no rclpy needed)."""
+
+    def io_with_graph(self, topics, override=None):
+        io = nb.RobotIO.__new__(nb.RobotIO)
+        io._bridge = types.SimpleNamespace(log=lambda *a, **k: None)
+        io._node = types.SimpleNamespace(
+            get_topic_names_and_types=lambda: [(t, [ty]) for t, ty in topics])
+        io._camera_look = True
+        io._camera_topic_override = override
+        io._camera_topic = None
+        io._camera_type = None
+        return io
+
+    def test_picks_first_present_in_order(self):
+        io = self.io_with_graph([
+            ('/aima/hal/sensor/rgb_head_front_center/rgb_image',
+             'sensor_msgs/msg/Image'),
+            ('/aima/hal/sensor/rgbd_head_front/rgb_image/compressed',
+             'sensor_msgs/msg/CompressedImage')])
+        io._choose_camera(timeout=0.5)
+        self.assertEqual(io._camera_topic,
+                         '/aima/hal/sensor/rgbd_head_front/rgb_image/compressed')
+        self.assertEqual(io._camera_type, 'CompressedImage')
+        self.assertTrue(io._camera_look)
+
+    def test_raw_image_topic_accepted(self):
+        io = self.io_with_graph([
+            ('/aima/hal/sensor/rgb_head_front_center/rgb_image',
+             'sensor_msgs/msg/Image')])
+        io._choose_camera(timeout=0.5)
+        self.assertEqual(io._camera_topic,
+                         '/aima/hal/sensor/rgb_head_front_center/rgb_image')
+        self.assertEqual(io._camera_type, 'Image')
+
+    def test_no_topic_disables(self):
+        io = self.io_with_graph([])
+        io._choose_camera(timeout=0.4)
+        self.assertFalse(io._camera_look)
+        self.assertIsNone(io._camera_topic)
+
+    def test_unsupported_type_disables(self):
+        io = self.io_with_graph([
+            ('/aima/hal/sensor/rgbd_head_front/rgb_image/compressed',
+             'std_msgs/msg/String')])
+        io._choose_camera(timeout=0.5)
+        self.assertFalse(io._camera_look)
+
+    def test_override_topic(self):
+        io = self.io_with_graph([
+            ('/custom/rgb', 'sensor_msgs/msg/Image'),
+            ('/aima/hal/sensor/rgbd_head_front/rgb_image/compressed',
+             'sensor_msgs/msg/CompressedImage')], override='/custom/rgb')
+        io._choose_camera(timeout=0.5)
+        self.assertEqual(io._camera_topic, '/custom/rgb')
+        self.assertEqual(io._camera_type, 'Image')
+
+
+@unittest.skipUnless(HAS_CV2, 'cv2 not installed')
+class FrameToJpegTests(unittest.TestCase):
+    def decode(self, jpeg):
+        return cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+
+    def test_rgb8_image_becomes_jpeg_within_640(self):
+        width, height = 1280, 720
+        msg = types.SimpleNamespace(
+            encoding='rgb8', width=width, height=height,
+            step=width * 3, data=bytes(width * height * 3))
+        jpeg = nb.frame_to_jpeg(msg)
+        self.assertTrue(jpeg[:2] == b'\xff\xd8')
+        img = self.decode(jpeg)
+        self.assertIsNotNone(img)
+        self.assertLessEqual(max(img.shape[:2]), 640)
+
+    def test_compressed_image_becomes_jpeg_within_640(self):
+        ok, buf = cv2.imencode(
+            '.jpg', np.full((2000, 1000, 3), 128, np.uint8))
+        self.assertTrue(ok)
+        msg = types.SimpleNamespace(data=buf.tobytes(), format='jpeg')
+        jpeg = nb.frame_to_jpeg(msg)
+        self.assertTrue(jpeg[:2] == b'\xff\xd8')
+        img = self.decode(jpeg)
+        self.assertIsNotNone(img)
+        self.assertLessEqual(max(img.shape[:2]), 640)
+
+    def test_unsupported_encoding_returns_none(self):
+        msg = types.SimpleNamespace(
+            encoding='yuv422', width=10, height=10, step=30,
+            data=bytes(300))
+        self.assertIsNone(nb.frame_to_jpeg(msg))
+
+    def test_small_image_not_upscaled(self):
+        width, height = 320, 240
+        msg = types.SimpleNamespace(
+            encoding='bgr8', width=width, height=height,
+            step=width * 3, data=bytes(width * height * 3))
+        jpeg = nb.frame_to_jpeg(msg)
+        img = self.decode(jpeg)
+        self.assertEqual(img.shape[1], width)
+        self.assertEqual(img.shape[0], height)
+
+
+@unittest.skipUnless(HAS_CV2, 'cv2 not installed')
+class CameraLookTests(unittest.TestCase):
+    def jpeg_msg(self):
+        ok, buf = cv2.imencode(
+            '.jpg', np.full((240, 320, 3), 200, np.uint8))
+        return types.SimpleNamespace(data=buf.tobytes(), format='jpeg')
+
+    def look_bridge(self, result=None, post_error=None, **over):
+        calls = {'grabs': 0, 'posts': 0}
+        bridge = make_bridge(io_backend=nb.RobotIO, camera_look=True, **over)
+        self.assertTrue(bridge.camera_look)
+
+        def grab():
+            calls['grabs'] += 1
+            return self.jpeg_msg()
+
+        def post(image):
+            calls['posts'] += 1
+            if post_error is not None:
+                raise post_error
+            return dict(result or {})
+
+        bridge._look_grab = grab
+        bridge._look_post = post
+        bridge.calls = calls
+        return bridge
+
+    def notes(self, bridge):
+        return [m['text'] for m in bridge.ws.sent
+                if m.get('type') == 'contextual_update']
+
+    def test_note_with_and_without_facing(self):
+        now = [1000.0]
+        bridge = self.look_bridge(
+            result={'landmark': 'the yellow pillar',
+                    'facing': 'reception', 'ms': 1200},
+            look_clock=lambda: now[0])
+        bridge.negotiated.set()
+        bridge._maybe_look()
+        self.assertEqual(self.notes(bridge),
+                         ['Camera: the robot seems to be at the yellow pillar, '
+                          'facing reception.'])
+        bridge._look_post = lambda image: {
+            'landmark': 'the yellow pillar', 'facing': None, 'ms': 900}
+        now[0] += 5.0
+        bridge._maybe_look()
+        self.assertEqual(self.notes(bridge)[-1],
+                         'Camera: the robot seems to be at the yellow pillar.')
+
+    def test_same_result_twice_sends_one_note(self):
+        bridge = self.look_bridge(
+            result={'landmark': 'the yellow pillar', 'facing': 'reception'})
+        bridge.negotiated.set()
+        bridge._maybe_look()
+        bridge._last_look = float('-inf')
+        bridge._maybe_look()
+        self.assertEqual(len(self.notes(bridge)), 1)
+        self.assertEqual(bridge.calls['posts'], 2)
+
+
+    def test_operator_line_resends_same_note(self):
+        bridge = self.look_bridge(result={'landmark': 'the yellow pillar'})
+        bridge.negotiated.set()
+        bridge._maybe_look()
+        self.assertEqual(len(self.notes(bridge)), 1)
+        bridge.on_event({'type': 'agent_response',
+                         'agent_response_event': {
+                             'agent_response':
+                                 'Operator, are we still at the pillar?'}})
+        bridge._last_look = float('-inf')
+        bridge._maybe_look()
+        self.assertEqual(len(self.notes(bridge)), 2)
+        self.assertEqual(self.notes(bridge)[0], self.notes(bridge)[1])
+
+    def test_null_landmark_sends_no_note(self):
+        logs = []
+        bridge = self.look_bridge(
+            result={'landmark': None, 'facing': None, 'ms': 800})
+        bridge.log = logs.append
+        bridge.negotiated.set()
+        bridge._maybe_look()
+        self.assertEqual(self.notes(bridge), [])
+        self.assertTrue(any('CAMERA: look -> nothing' in line
+                            for line in logs))
+
+    def test_post_failure_logs_once_for_two_failures(self):
+        logs = []
+        bridge = self.look_bridge(post_error=RuntimeError('boom'))
+        bridge.log = logs.append
+        bridge.negotiated.set()
+        bridge._maybe_look()
+        bridge._last_look = float('-inf')
+        bridge._maybe_look()
+        fails = [line for line in logs if 'CAMERA: look failed' in line]
+        self.assertEqual(len(fails), 1)
+        self.assertIn('post:RuntimeError', fails[0])
+        self.assertEqual(self.notes(bridge), [])
+        self.assertEqual(bridge.calls['posts'], 2)
+
+    def test_min_gap_uses_injected_clock(self):
+        now = [1000.0]
+        bridge = self.look_bridge(look_clock=lambda: now[0])
+        bridge.negotiated.set()
+        self.assertTrue(bridge._maybe_look())
+        now[0] += 3.9
+        self.assertFalse(bridge._maybe_look())
+        self.assertEqual(bridge.calls['posts'], 1)
+        now[0] += 0.2
+        self.assertTrue(bridge._maybe_look())
+        self.assertEqual(bridge.calls['posts'], 2)
+
+    def test_operator_question_sets_due_flag(self):
+        bridge = self.look_bridge()
+        bridge.on_event({'type': 'agent_response',
+                         'agent_response_event': {
+                             'agent_response':
+                                 'Operator, which way are we facing?'}})
+        self.assertTrue(bridge._look_due.is_set())
+        self.assertTrue(bridge._look_operator_asked)
+
+    def test_operator_statement_does_not_set_due(self):
+        bridge = self.look_bridge()
+        bridge.on_event({'type': 'agent_response',
+                         'agent_response_event': {
+                             'agent_response': 'Operator, hold on.'}})
+        self.assertFalse(bridge._look_due.is_set())
+        self.assertTrue(bridge._look_operator_asked)
+
+    def test_no_look_while_not_negotiated(self):
+        bridge = self.look_bridge()
+        self.assertFalse(bridge._maybe_look())
+        self.assertEqual(bridge.calls['grabs'], 0)
+        self.assertEqual(bridge.calls['posts'], 0)
+
+    def test_camera_look_disabled_without_robot_io(self):
+        logs = []
+        with mock.patch.object(nb.Bridge, 'log',
+                               lambda self, text: logs.append(text)):
+            bridge = make_bridge(camera_look=True)
+        self.assertFalse(bridge.camera_look)
+        self.assertTrue(any('look needs the robot IO' in line
+                            for line in logs))
+
+    def test_camera_look_disabled_in_direct_mode(self):
+        logs = []
+        with mock.patch.object(nb.Bridge, 'log',
+                               lambda self, text: logs.append(text)):
+            bridge = make_bridge(io_backend=nb.RobotIO, camera_look=True,
+                                 session='direct')
+        self.assertFalse(bridge.camera_look)
+        self.assertTrue(any('access code' in line for line in logs))

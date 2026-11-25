@@ -199,38 +199,47 @@ const runD = [
   { label: 'first leg done', send: 'Done.', expect: /yellow pillar/i, reject: arabic },
 ];
 
-// Run E: the camera gives the position at the start and confirms the arrival.
+// Run E: the camera suggests the start; the operator confirms it and the arrival.
 const runE = [
-  { label: 'camera knows the position; visitor asks for the kitchen',
-    context: ['Camera: the robot is now at sign B.'],
+  { label: 'camera suggests the position; visitor asks for the kitchen',
+    context: ['Camera: the robot seems to be at the yellow pillar, facing reception.'],
     send: 'Take me to the kitchen please.',
-    expect: /reception/i, reject: /are we at|where is the robot/i },
-  { label: 'operator gives the facing', send: 'Facing reception.',
+    expect: /camera[\s\S]*yellow pillar/i, reject: /where is the robot|pitch room door/i },
+  { label: 'operator confirms the camera', send: 'Yes.',
     expect: /turn left[\s\S]*menu boards/i, reject: arabic },
-  { label: 'camera confirms the arrival',
-    context: ['Camera: the robot is now at the kitchen marker.'],
-    send: 'Done.',
-    expect: /arrived|kitchen/i, reject: /can you confirm|confirm we/i },
+  { label: 'camera sees the menu boards; operator still confirms the arrival',
+    context: ['Camera: the robot seems to be at the cafeteria menu boards, facing menu boards.'],
+    send: 'Done.', expect: /confirm/i, reject: arabic },
+  { label: 'operator confirms arrival', send: 'Yes.', expect: /arrived|kitchen/i, reject: arabic },
 ];
 
-// Run F: the camera reports a different stop than the one the step expected.
+// Run F: the operator gives a vague position; the camera note turns it into a yes/no.
 const runF = [
   { label: 'visitor asks for the kitchen', send: 'Take me to the kitchen please.',
     expect: /are we at the pitch room door/i, reject: arabic },
-  { label: 'operator says yes', send: 'Yes.',
-    expect: /purple pillar/i, reject: arabic },
-  { label: 'camera says the robot is already at sign B',
-    context: ['Camera: the robot is now at sign B.'],
-    send: 'Done.',
-    expect: /turn left[\s\S]*menu boards/i, reject: /stop at the yellow pillar/i },
+  { label: 'operator is vague; camera knows',
+    context: ['Camera: the robot seems to be at the purple pillar, facing reception.'],
+    send: "No. I'm facing a lot of tables.",
+    expect: /camera[\s\S]*purple pillar/i, reject: /where is the robot/i },
+  { label: 'operator confirms the camera', send: 'Yes.',
+    expect: /walk straight[\s\S]*yellow pillar/i, reject: arabic },
+];
+
+// Run G: asked about the camera before it has recognised anything.
+const runG = [
+  { label: 'visitor asks for the kitchen', send: 'Take me to the kitchen please.',
+    expect: /are we at the pitch room door/i, reject: arabic },
+  { label: 'operator asks the agent to use the camera', send: 'Can you use the camera and tell me?',
+    expect: /camera/i, reject: /printed|\bsigns?\b/i },
 ];
 
 await drive('Run A: Arabic visitor to the kitchen', runA);
 await drive('Run B: return leg, unmapped change, other place', runB);
 await drive('Run C: English visitor, unmapped then kitchen, facing by landmark', runC);
 await drive('Run D: operator confirms the likely start with one word', runD);
-await drive('Run E: camera gives the position and confirms the arrival', runE);
-await drive('Run F: camera corrects the position mid-route', runF);
+await drive('Run E: camera suggests the start, operator confirms', runE);
+await drive('Run F: vague operator answer, camera yes/no', runF);
+await drive('Run G: camera question before any recognition', runG);
 
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n===== ${results.length - failed.length}/${results.length} expectations passed =====`);
