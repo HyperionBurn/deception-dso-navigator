@@ -10,7 +10,7 @@
     "api/route.mjs": { "maxDuration": 10 },
     "api/token.mjs": { "maxDuration": 10 },
     "api/research.mjs": { "maxDuration": 30 },
-    "api/locate.mjs": { "maxDuration": 20 }
+    "api/locate.mjs": { "maxDuration": 30 }
   },
   "headers": [
     {

@@ -73,6 +73,9 @@ ALLOWED_ROS_NAMES = frozenset({
     '/aima/hal/sensor/touch_head',
     '/aima/hal/sensor/rgbd_head_front/rgb_image/compressed',
     '/aima/hal/sensor/rgbd_head_front/rgb_camera_info',
+    '/aima/hal/sensor/rgbd_head_front/rgb_image',
+    '/aima/hal/sensor/rgb_head_front_center/rgb_image/compressed',
+    '/aima/hal/sensor/rgb_head_front_center/rgb_image',
     '/aimdk_5Fmsgs/srv/RequestAudioFocus',
     '/aimdk_5Fmsgs/srv/AbandonAudioFocus',
     '/aimdk_5Fmsgs/srv/StopAudioPlay',
@@ -586,7 +589,7 @@ LOOK_TOPICS = (
 LOOK_INTERVAL = 10.0
 LOOK_MIN_GAP = 4.0
 LOOK_GRAB_TIMEOUT = 2.0
-LOOK_POST_TIMEOUT = 15.0
+LOOK_POST_TIMEOUT = 25.0
 LOOK_MAX_SIDE = 640
 
 
@@ -1132,32 +1135,36 @@ class RobotIO:
 
     # --- camera look (on-demand frames for /api/locate) ----------------------
 
-    def _choose_camera(self, timeout=3.0):
-        """Pick the front camera topic from the live graph; frames are only
-        ever grabbed one at a time, never subscribed continuously."""
-        deadline = time.monotonic() + timeout
-        names = {}
-        while time.monotonic() < deadline:
-            try:
-                names = {n: t[0] for n, t in
-                         self._node.get_topic_names_and_types()}
-            except Exception:
-                names = {}
-            if names:
-                break
-            time.sleep(0.2)
+    def _find_camera(self):
+        """One look at the live graph; sets the camera topic when found."""
+        try:
+            names = {n: t[0] for n, t in
+                     self._node.get_topic_names_and_types()}
+        except Exception:
+            names = {}
         topic, kind = choose_look_topic(names, self._camera_topic_override)
-        if topic is None:
-            self._bridge.log('CAMERA: no front camera topic found; look off')
-            self._camera_look = False
-            return
-        self._camera_topic, self._camera_type = topic, kind
-        self._bridge.log(f'CAMERA: look on {topic} ({kind})')
+        if topic is not None:
+            self._camera_topic, self._camera_type = topic, kind
+            self._bridge.log(f'CAMERA: look on {topic} ({kind})')
+        return topic
+
+    def _choose_camera(self, timeout=3.0):
+        """Pick the front camera topic from the live graph. Discovery of a
+        big graph can take longer than the start-up wait, so a miss here is
+        retried on every look; frames are only ever grabbed one at a time."""
+        deadline = time.monotonic() + timeout
+        while not self._find_camera():
+            if time.monotonic() >= deadline:
+                self._bridge.log('CAMERA: no front camera topic found yet; '
+                                 'retrying on each look')
+                return
+            time.sleep(0.3)
 
     def grab_frame(self, timeout=LOOK_GRAB_TIMEOUT):
         """One-shot frame: subscribe, wait for a message, destroy the
         subscription. A raw-image subscription is never kept alive."""
-        if not self._camera_look or not self._camera_topic:
+        if not self._camera_look or (not self._camera_topic and
+                                     not self._find_camera()):
             return None
         from rclpy.qos import (QoSHistoryPolicy, QoSProfile,
                                QoSReliabilityPolicy)
@@ -1445,7 +1452,6 @@ class Bridge:
                         'type': 'contextual_update',
                         'text': build_reconnect_text(self.transcripts),
                     })
-                    self.phrases.play('back_en')
             return
         if kind == 'ping':
             event_id = (event.get('ping_event') or {}).get('event_id')
@@ -1525,7 +1531,7 @@ class Bridge:
         import websocket
         ws = websocket.create_connection(
             url, subprotocols=['convai'], timeout=SOCKET_TIMEOUT,
-            skip_utf8_validation=True)
+            skip_utf8_validation=True, enable_multithread=True)
         with self._ws_lock:
             self.ws = ws
         self.log('STATE: socket open')
@@ -1683,7 +1689,6 @@ class Bridge:
             self.reconnected = True
             self._mute_greeting = True
             self.dropping = True
-            self.phrases.play('lost_en', 'lost_ar')
             if attempts >= len(RECONNECT_DELAYS):
                 self.error_state = True
                 self.log('ERROR: reconnect attempts exhausted; '
@@ -1993,7 +1998,8 @@ def _preflight_socket(url, check):
     try:
         ws = websocket.create_connection(url, subprotocols=['convai'],
                                          timeout=SOCKET_TIMEOUT,
-                                         skip_utf8_validation=True)
+                                         skip_utf8_validation=True,
+                                         enable_multithread=True)
     except Exception as error:
         check('agent websocket', False, f'connect: {error}')
         return

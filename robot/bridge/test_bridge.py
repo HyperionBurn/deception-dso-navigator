@@ -1307,18 +1307,19 @@ class LookTopicPickTests(unittest.TestCase):
                          '/aima/hal/sensor/rgb_head_front_center/rgb_image')
         self.assertEqual(io._camera_type, 'Image')
 
-    def test_no_topic_disables(self):
+    def test_no_topic_yet_retries_on_each_look(self):
         io = self.io_with_graph([])
         io._choose_camera(timeout=0.4)
-        self.assertFalse(io._camera_look)
+        self.assertTrue(io._camera_look)
         self.assertIsNone(io._camera_topic)
+        self.assertIsNone(io.grab_frame())
 
-    def test_unsupported_type_disables(self):
+    def test_unsupported_type_is_not_used(self):
         io = self.io_with_graph([
             ('/aima/hal/sensor/rgbd_head_front/rgb_image/compressed',
              'std_msgs/msg/String')])
         io._choose_camera(timeout=0.5)
-        self.assertFalse(io._camera_look)
+        self.assertIsNone(io._camera_topic)
 
     def test_override_topic(self):
         io = self.io_with_graph([
