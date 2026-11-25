@@ -16,7 +16,7 @@ survey: 2026-11-24 18:47 | video only, not yet walked | IMG_3440.MOV
 # facing reception; the cafeteria is on the left.
 start: pitch_room facing door
 
-anchor team_tables: the purple pillar | aliases: the purple pillar with the green speech bubble, purple pillar, magenta pillar, maroon pillar, burgundy pillar, plum pillar, speech bubble, green speech bubble, yellow speech bubble, team tables, the desks, طاولات الفرق, العمود البنفسجي
+anchor team_tables: the team tables | aliases: the purple pillar, the purple pillar with the green speech bubble, purple pillar, magenta pillar, maroon pillar, burgundy pillar, plum pillar, speech bubble, green speech bubble, yellow speech bubble, team tables, the desks, طاولات الفرق, العمود البنفسجي
 anchor pitch_room: the pitch room | aliases: inside the pitch room, pitch room, the start, قاعة العروض
 anchor A: the pitch room door | aliases: sign A, pitch room door, black wall, steel bin, باب قاعة العروض
 anchor B: the yellow pillar | aliases: sign B, yellow pillar, yellow column, yellow pillar with the glass board, العمود الأصفر
@@ -49,5 +49,7 @@ leg B facing team tables -> kitchen : around | exit facing menu boards
 # WALKED 2026-11-25 by Wasif on the floor with Robot 1: from inside the pitch
 # room facing its door, walk straight out, turn right, walk straight to the cafe.
 leg pitch_room facing door -> A : straight | exit facing walkway
-leg A facing walkway -> kitchen : right | exit facing cafeteria
+leg A facing walkway -> kitchen : right | exit facing dining area
 leg A facing walkway -> team_tables : right | exit facing reception
+# WALKED 2026-11-25 (Wasif): at the cafe, turn right and walk straight to the team tables.
+leg kitchen facing dining area -> team_tables : right | exit facing pitch room
