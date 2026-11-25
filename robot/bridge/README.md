@@ -74,6 +74,7 @@ python robot/bridge/navigator_bridge.py --io null
   buffer) and `StopAudioPlay` is called.
 - **Audio focus**: requested at priority 8 on start; if `focus_response`
   reports a loss for our pkg_name it is re-requested automatically.
+- **Judge screen** (`--judge-screen PORT`, off by default): a read-only page on `127.0.0.1:PORT` with the latest operator step in large text, what was heard and said, and the latency summary. Refreshes every second. Open it on the laptop (`--io laptop`) or through an SSH tunnel. Tested offline only; keep it out of the filmed takes until it has run on the robot.
 - **Camera markers** (`--camera-markers`): read-only subscription to the RGB-D
   front camera's MJPEG topic, ArUco DICT_4X4_50 at ≤2 fps. A marker seen in 3
   consecutive processed frames is sent to the agent as a `contextual_update`,

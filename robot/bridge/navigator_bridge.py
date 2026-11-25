@@ -15,6 +15,8 @@ import base64
 import collections
 import csv
 import datetime
+import html
+import http.server
 import json
 import os
 import queue
@@ -404,6 +406,72 @@ class LatencyLog:
         if self._fh:
             self._fh.close()
             self._fh = None
+
+
+def render_judge_page(transcripts, latency, refresh_s=1):
+    """Judge screen HTML: the latest operator step in large text, the
+    conversation so far and the latency summary. Only what the agent and the
+    speech recogniser already said; nothing is added."""
+    lines = list(transcripts)
+    step = next((text for role, text in reversed(lines)
+                 if role == 'AGENT' and 'operator' in text.lower()), '')
+    rows = ''.join(
+        f'<li class="{"agent" if role == "AGENT" else "user"}"><b>'
+        f'{"Agent" if role == "AGENT" else "Heard"}</b> {html.escape(text)}</li>'
+        for role, text in lines)
+    return (
+        '<!doctype html><html><head><meta charset="utf-8">'
+        f'<meta http-equiv="refresh" content="{refresh_s}">'
+        '<title>Navigator - judge screen</title><style>'
+        'body{font:20px system-ui,sans-serif;margin:2em;background:#111;color:#eee}'
+        'h1{font-size:44px;color:#ffd84d;min-height:1.2em}ul{list-style:none;padding:0}'
+        'li{margin:.4em 0}li.agent b{color:#7fd1ff}li.user b{color:#9f9}'
+        'small{color:#999}</style></head><body>'
+        '<small>Operator step</small>'
+        f'<h1>{html.escape(step)}</h1>'
+        f'<ul>{rows}</ul>'
+        f'<small>Latency: {html.escape(latency)}</small>'
+        '</body></html>')
+
+
+class JudgeScreen:
+    """Off by default (--judge-screen PORT). A read-only page on this machine
+    only (127.0.0.1); open it through an SSH tunnel or on the laptop."""
+
+    def __init__(self, bridge, port, host='127.0.0.1'):
+        page = lambda: render_judge_page(bridge.transcripts, bridge.latency.summary())
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                # Refuse other Host names so a web page cannot read the
+                # transcript through DNS rebinding.
+                # Any port, so an SSH tunnel may use a different local port.
+                host = (self.headers.get('Host') or '').rsplit(':', 1)[0]
+                if host not in ('127.0.0.1', 'localhost'):
+                    self.send_error(403)
+                    return
+                if self.path not in ('/', '/index.html'):
+                    self.send_error(404)
+                    return
+                body = page().encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', str(len(body)))
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        self._server = http.server.ThreadingHTTPServer((host, port), Handler)
+        self.port = self._server.server_address[1]
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    def close(self):
+        self._server.shutdown()
+        self._server.server_close()
 
 
 def phase_for(state, now=None):
@@ -1011,6 +1079,8 @@ class Bridge:
                          or PROD_AGENT_ID)
         self.api_key = os.environ.get('ELEVENLABS_API_KEY', '').strip()
         self.half_duplex = args.half_duplex
+        self.judge_port = getattr(args, 'judge_screen', None)
+        self.judge = None
         self._log_lines = []
         self._log_lock = threading.Lock()
         self._log_file = args.log_file
@@ -1298,6 +1368,15 @@ class Bridge:
         return session_url(self.session_mode, self.site, self.code,
                            self.agent_id, self.api_key, log=self.log)
 
+    def _start_judge(self):
+        if self.judge_port is None:
+            return
+        try:
+            self.judge = JudgeScreen(self, self.judge_port)
+            self.log(f'STATE: judge screen on http://127.0.0.1:{self.judge.port}/')
+        except (OSError, OverflowError) as error:
+            self.log(f'WARN: judge screen not started: {error}')
+
     def run(self):
         need_code = self.session_mode == 'site' or \
             (self.session_mode == 'auto' and not self.api_key)
@@ -1314,6 +1393,7 @@ class Bridge:
             except Exception as error:
                 self.log(f'ERROR: {self.io.name} IO failed to start: {error}')
                 return 2
+        self._start_judge()
         sender = threading.Thread(target=self._mic_sender, daemon=True)
         player = threading.Thread(target=self._playback_worker, daemon=True)
         keys = threading.Thread(target=self._key_reader, daemon=True)
@@ -1408,6 +1488,9 @@ class Bridge:
                 self.io.set_phase('stopped')
             except Exception:
                 pass
+        if self.judge:
+            self.judge.close()
+            self.judge = None
         self.latency.close()
         self.log('bridge stopped')
 
@@ -1715,6 +1798,8 @@ def main(argv=None):
                         help='read-only ArUco marker sightings on the RGB-D '
                              'front camera, sent to the agent as '
                              'contextual_update (needs cv2 in the container)')
+    parser.add_argument('--judge-screen', type=int, default=None, metavar='PORT',
+                        help='off by default: read-only transcript page on 127.0.0.1:PORT')
     parser.add_argument('--no-touch', action='store_true',
                         help='robot only: disable head-touch fresh take')
     parser.add_argument('--log-dir', default=os.path.join(os.path.dirname(__file__), 'logs'))
