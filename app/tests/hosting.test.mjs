@@ -154,3 +154,53 @@ test('provider failures and unsafe URLs all return the same generic error', asyn
     assert.equal(await expectError(await session.fetch(request()), 502), 'Unable to start live voice.');
   }
 });
+
+test('session agent selection: navigator default, stage id, rejections', async t => {
+  const STAGE = 'agent_stage_test';
+  configure(t, { ELEVENLABS_STAGE_AGENT_ID: STAGE });
+  const upstream = t.mock.method(globalThis, 'fetch');
+
+  // Explicit "navigator" signs the configured agent, same as no field.
+  upstream.mock.mockImplementationOnce(async () => Response.json({ signed_url: SIGNED }));
+  let response = await session.fetch(request({
+    body: JSON.stringify({ access_code: CODE, agent: 'navigator' }),
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(new URL(upstream.mock.calls.at(-1).arguments[0])
+    .searchParams.get('agent_id'), AGENT);
+
+  // "stage" signs ELEVENLABS_STAGE_AGENT_ID and safeSignedUrl accepts it.
+  const stageSigned = SIGNED.replace(AGENT, STAGE);
+  upstream.mock.mockImplementationOnce(async () => Response.json({ signed_url: stageSigned }));
+  response = await session.fetch(request({
+    body: JSON.stringify({ access_code: CODE, agent: 'stage' }),
+  }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { signed_url: stageSigned });
+  assert.equal(new URL(upstream.mock.calls.at(-1).arguments[0])
+    .searchParams.get('agent_id'), STAGE);
+
+  // Unknown agent values -> 400 without reaching the provider.
+  for (const agent of ['wizard', 42, null, 'STAGE']) {
+    const before = upstream.mock.callCount();
+    await expectError(await session.fetch(request({
+      body: JSON.stringify({ access_code: CODE, agent }),
+    })), 400);
+    assert.equal(upstream.mock.callCount(), before);
+  }
+
+  // A bad access code is still 401 before agent selection matters.
+  await expectError(await session.fetch(request({
+    body: JSON.stringify({ access_code: 'wrong-code', agent: 'stage' }),
+  })), 401);
+});
+
+test('stage agent without a configured id returns 503', async t => {
+  configure(t, { ELEVENLABS_STAGE_AGENT_ID: undefined });
+  const upstream = t.mock.method(globalThis, 'fetch',
+    () => { throw new Error('Unexpected signing call'); });
+  await expectError(await session.fetch(request({
+    body: JSON.stringify({ access_code: CODE, agent: 'stage' }),
+  })), 503);
+  assert.equal(upstream.mock.callCount(), 0);
+});
