@@ -20,11 +20,13 @@ export const COURSE_DESTINATIONS = Object.freeze([
 // Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
 // Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
 // Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
+// Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
+// Surveyed 2026-11-24 18:47 by video only, not yet walked (IMG_3440.MOV); ingested by scripts/ingest-survey.mjs.
 export const FLOOR_MAP = Object.freeze({
   survey: Object.freeze({ checked_at: "2026-11-24 18:47", checked_by: "video only, not yet walked", reference: "IMG_3440.MOV" }),
   start: Object.freeze({ anchor: "pitch_room", facing: "door" }),
   anchors: Object.freeze([
-    Object.freeze({ id: "team_tables", landmark: "the purple pillar", aliases: Object.freeze(["the purple pillar with the green speech bubble","purple pillar","magenta pillar","maroon pillar","burgundy pillar","plum pillar","speech bubble","green speech bubble","yellow speech bubble","team tables","the desks","طاولات الفرق","العمود البنفسجي"]) }),
+    Object.freeze({ id: "team_tables", landmark: "the team tables", aliases: Object.freeze(["the purple pillar","the purple pillar with the green speech bubble","purple pillar","magenta pillar","maroon pillar","burgundy pillar","plum pillar","speech bubble","green speech bubble","yellow speech bubble","team tables","the desks","طاولات الفرق","العمود البنفسجي"]) }),
     Object.freeze({ id: "pitch_room", landmark: "the pitch room", aliases: Object.freeze(["inside the pitch room","pitch room","the start","قاعة العروض"]) }),
     Object.freeze({ id: "sign_a", landmark: "the pitch room door", aliases: Object.freeze(["sign A","pitch room door","black wall","steel bin","باب قاعة العروض"]) }),
     Object.freeze({ id: "sign_b", landmark: "the yellow pillar", aliases: Object.freeze(["sign B","yellow pillar","yellow column","yellow pillar with the glass board","العمود الأصفر"]) }),
@@ -43,8 +45,9 @@ export const FLOOR_MAP = Object.freeze({
     Object.freeze({ from: "sign_b", to: "team_tables", action: "around_then_straight", entry_pose: {"facing":"reception"}, exit_pose: {"facing":"pitch room"} }),
     Object.freeze({ from: "sign_b", to: "kitchen", action: "around_then_straight", entry_pose: {"facing":"team tables"}, exit_pose: {"facing":"menu boards"} }),
     Object.freeze({ from: "pitch_room", to: "sign_a", action: "walk_straight", entry_pose: {"facing":"door"}, exit_pose: {"facing":"walkway"} }),
-    Object.freeze({ from: "sign_a", to: "kitchen", action: "right_then_straight", entry_pose: {"facing":"walkway"}, exit_pose: {"facing":"cafeteria"} }),
+    Object.freeze({ from: "sign_a", to: "kitchen", action: "right_then_straight", entry_pose: {"facing":"walkway"}, exit_pose: {"facing":"dining area"} }),
     Object.freeze({ from: "sign_a", to: "team_tables", action: "right_then_straight", entry_pose: {"facing":"walkway"}, exit_pose: {"facing":"reception"} }),
+    Object.freeze({ from: "kitchen", to: "team_tables", action: "right_then_straight", entry_pose: {"facing":"dining area"}, exit_pose: {"facing":"pitch room"} }),
   ]),
 });
 

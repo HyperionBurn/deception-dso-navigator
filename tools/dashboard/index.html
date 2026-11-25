@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team Deception · Mission Control</title>
+<style>
+  :root {
+    --bg: #070b12;
+    --panel: #0e141d;
+    --panel-2: #121a26;
+    --line: #1e2a3a;
+    --text: #e6edf6;
+    --dim: #8b9bb4;
+    --teal: #2dd4bf;
+    --amber: #f5a524;
+    --green: #34d399;
+    --red: #f87171;
+    --grey: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 500px at 70% -10%, #0f2436 0%, transparent 60%),
+      radial-gradient(900px 400px at 10% 110%, #1a1030 0%, transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 14px 22px; border-bottom: 1px solid var(--line);
+    background: rgba(10, 15, 23, .8); backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  h1 { font-size: 17px; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
+  h1 .dot { color: var(--teal); }
+  .pill {
+    font-size: 12px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
+    padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--dim); white-space: nowrap;
+    transition: color .3s, border-color .3s, box-shadow .3s;
+  }
+  .pill.live { color: var(--green); border-color: #14532d; box-shadow: 0 0 12px #34d39933; }
+  .pill.warn { color: var(--amber); border-color: #7c4a03; box-shadow: 0 0 12px #f5a52433; }
+  .pill.bad  { color: var(--red);  border-color: #7f1d1d; box-shadow: 0 0 12px #f8717133; }
+  .spacer { flex: 1; }
+  #clock { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 15px; color: var(--dim); }
+  .counters { display: flex; gap: 10px; flex-wrap: wrap; }
+  .counter {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 6px 12px; font-size: 12px; color: var(--dim); text-align: center; min-width: 74px;
+  }
+  .counter b { display: block; font-size: 19px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .counter.turns b { color: var(--teal); }
+  .counter.drops b { color: var(--red); }
+  .counter.looks b { color: var(--amber); }
+  .counter.looks .sub { font-size: 10px; color: var(--dim); }
+
+  main { flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 14px 22px 8px; min-height: 0; }
+  .grid { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; min-height: 0; }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+    box-shadow: 0 8px 30px #0006;
+  }
+  .card h2 {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+
+  /* hero */
+  #hero { position: relative; overflow: hidden; }
+  #hero .kicker { font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--dim); }
+  #heroCmd {
+    font-size: clamp(26px, 3.4vw, 44px); font-weight: 750; line-height: 1.15;
+    margin: 6px 0 4px; min-height: 1.2em; color: var(--text);
+    text-shadow: 0 0 24px #2dd4bf22;
+  }
+  #heroMeta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--dim); }
+  #heroStep {
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; color: var(--teal);
+  }
+  #heroIdle { color: var(--grey); font-size: 15px; }
+  .pulse { animation: pulse .9s ease-out; }
+  @keyframes pulse {
+    0% { color: var(--amber); text-shadow: 0 0 30px #f5a52488; transform: translateX(0); }
+    30% { transform: translateX(3px); }
+    60% { transform: translateX(-2px); }
+    100% { color: var(--text); text-shadow: 0 0 24px #2dd4bf22; transform: none; }
+  }
+  #heroCmd.arrived { color: var(--green); text-shadow: 0 0 30px #34d39966; }
+
+  /* conversation */
+  #chatCol { display: flex; flex-direction: column; min-height: 0; }
+  #chat {
+    flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+    padding: 4px 6px 10px; min-height: 220px;
+  }
+  .bubble {
+    max-width: 78%; padding: 9px 14px; border-radius: 14px; font-size: 15.5px; line-height: 1.45;
+    animation: fadein .35s ease-out; word-wrap: break-word;
+  }
+  @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .bubble .t { display: block; font-size: 10.5px; color: var(--dim); margin-bottom: 3px; font-family: ui-monospace, Consolas, monospace; }
+  .b-visitor { align-self: flex-start; background: #1a2230; border: 1px solid #26334a; border-bottom-left-radius: 4px; }
+  .b-agent { align-self: flex-end; background: #0f3a38; border: 1px solid #14524d; border-bottom-right-radius: 4px; }
+  .chip {
+    display: inline-block; background: #3a2a08; color: var(--amber);
+    border: 1px solid #7c5a10; border-radius: 7px; padding: 1px 8px; margin: 0 2px;
+    font-weight: 600; font-size: .92em;
+  }
+  .speaking { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--teal); }
+  .speaking::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  #chatEmpty { color: var(--grey); text-align: center; margin: auto; font-size: 14px; }
+
+  /* side column */
+  .side { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+  #camBig { font-size: 24px; font-weight: 700; line-height: 1.2; }
+  #camBig.none { color: var(--grey); font-size: 17px; font-weight: 500; }
+  #camSub { font-size: 12.5px; color: var(--dim); margin-top: 4px; font-family: ui-monospace, Consolas, monospace; }
+  .dots { display: flex; gap: 7px; margin-top: 12px; }
+  .dot { width: 13px; height: 13px; border-radius: 50%; background: #22304a; border: 1px solid var(--line); }
+  .dot.ok { background: var(--green); box-shadow: 0 0 8px #34d39988; }
+  .dot.none { background: #3a4757; }
+  .dot.fail { background: var(--red); box-shadow: 0 0 8px #f8717188; }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px dashed #16202e; }
+  .kv:last-child { border-bottom: 0; }
+  .kv span:first-child { color: var(--dim); }
+  .kv span:last-child { font-family: ui-monospace, Consolas, monospace; font-size: 12px; text-align: right; word-break: break-all; }
+  .drops { font-size: 12.5px; color: var(--red); font-family: ui-monospace, Consolas, monospace; line-height: 1.7; }
+  .drops .none { color: var(--grey); }
+  .sesslines { font-size: 12px; color: var(--dim); font-family: ui-monospace, Consolas, monospace; line-height: 1.6; word-break: break-all; }
+
+  /* console */
+  #consoleCard { display: flex; flex-direction: column; }
+  #consoleHead { display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
+  #consoleHead h2 { margin: 0; }
+  #consoleHead .chev { margin-left: auto; color: var(--dim); transition: transform .2s; }
+  #consoleCard.closed #console { display: none; }
+  #consoleCard.closed .chev { transform: rotate(-90deg); }
+  .tgl { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .tgl input { accent-color: var(--teal); }
+  #console {
+    margin-top: 10px; height: 190px; overflow-y: auto;
+    background: #05080d; border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 10px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  #console.closed-ps .ps { display: none; }
+  .cl { white-space: pre-wrap; word-break: break-word; animation: fadein .3s; }
+  .cl .ts { color: #3d4c63; }
+  .cl.agent { color: #5eead4; } .cl.visitor { color: #cbd5e1; }
+  .cl.camera { color: #fbbf24; } .cl.state { color: #93c5fd; }
+  .cl.keys { color: #f472b6; } .cl.session { color: #a78bfa; }
+  .cl.latency { color: #67e8f9; } .cl.send { color: #fca5a5; }
+  .cl.mic, .cl.emoji, .cl.led { color: #94a3b8; }
+  .cl.focus { color: #fdba74; } .cl.playstate { color: #475569; }
+  .cl.system { color: #64748b; } .cl.file { color: #34d399; font-weight: 700; }
+  .cl.link { color: #f87171; font-weight: 700; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #22304a; border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  #route { margin-top: 14px; }
+  #route .kicker { margin-bottom: 14px; }
+  .stepper { display: flex; align-items: stretch; gap: 0; }
+  .node { flex: 0 0 auto; min-width: 190px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px;
+          background: rgba(255,255,255,0.02); transition: all .35s ease; }
+  .node b { display: block; font-size: 20px; color: var(--text); }
+  .node small { color: var(--dim); font-size: 13px; }
+  .leg { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; align-items: center;
+         padding: 0 10px; color: var(--dim); font-size: 14px; min-width: 160px; }
+  .leg .bar { height: 4px; width: 100%; border-radius: 4px; background: var(--line); margin-top: 8px; overflow: hidden; position: relative; }
+  .leg .bar i { position: absolute; inset: 0; width: 0; background: var(--amber); transition: width .5s ease; }
+  .node.active { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(245,165,36,.18); }
+  .node.done { border-color: var(--green); }
+  .node.done b::after { content: " ✓"; color: var(--green); }
+  .leg.active { color: var(--amber); }
+  .leg.active .bar i { width: 60%; animation: legpulse 1.2s ease-in-out infinite alternate; }
+  .leg.done { color: var(--green); }
+  .leg.done .bar i { width: 100%; background: var(--green); }
+  @keyframes legpulse { from { opacity: .55; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Team Deception <span class="dot">·</span> AI Voice Navigator <span class="dot">·</span> Robot live</h1>
+  <span class="pill" id="linkPill">SSH —</span>
+  <span class="pill" id="sockPill">Socket —</span>
+  <div class="spacer"></div>
+  <div class="counters">
+    <div class="counter turns">Turns<b id="cTurns">0</b></div>
+    <div class="counter drops">Socket drops<b id="cDrops">0</b></div>
+    <div class="counter looks">Camera looks<b id="cLooks">0</b><span class="sub" id="cLooksSub">— ok · — none · — fail</span></div>
+  </div>
+  <span id="clock">--:--:--</span>
+</header>
+
+<main>
+  <section class="card" id="hero">
+    <div class="kicker">Operator command</div>
+    <div id="heroCmd"><span id="heroIdle">Waiting for the agent's next instruction…</span></div>
+    <div id="heroMeta" style="display:none">
+      <span id="heroTime"></span>
+      <span id="heroStep">step 0</span>
+    </div>
+  </section>
+
+
+  <section class="card" id="route">
+    <div class="kicker">Route · Pitch room → Cafeteria (walked on the floor)</div>
+    <div class="stepper">
+      <div class="node" id="rn0"><b>Pitch room</b><small>start · facing the door</small></div>
+      <div class="leg" id="rl1"><span>Walk straight</span><div class="bar"><i></i></div></div>
+      <div class="node" id="rn1"><b>Pitch room door</b><small>step 1</small></div>
+      <div class="leg" id="rl2"><span>Turn right · walk straight</span><div class="bar"><i></i></div></div>
+      <div class="node" id="rn2"><b>Cafeteria</b><small>step 2 · operator confirms</small></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card" id="chatCol">
+      <h2>Conversation</h2>
+      <div id="chat"><div id="chatEmpty">No conversation yet — the bridge log will appear here.</div></div>
+    </section>
+
+    <aside class="side">
+      <section class="card">
+        <h2>Camera</h2>
+        <div id="camBig" class="none">No looks yet</div>
+        <div id="camSub"></div>
+        <div class="dots" id="camDots"></div>
+      </section>
+      <section class="card">
+        <h2>Connection</h2>
+        <div class="kv"><span>Socket</span><span id="connState">—</span></div>
+        <div class="kv"><span>SSH link</span><span id="connLink">—</span></div>
+        <div class="drops" id="connDrops"><span class="none">no drops</span></div>
+      </section>
+      <section class="card">
+        <h2>Session</h2>
+        <div class="kv"><span>Log file</span><span id="sessFile">—</span></div>
+        <div class="kv"><span>Bridge start</span><span id="sessStart">—</span></div>
+        <div class="sesslines" id="sessLines"></div>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card" id="consoleCard">
+    <div id="consoleHead">
+      <h2>Raw log</h2>
+      <label class="tgl"><input type="checkbox" id="showPs"> show PLAYSTATE</label>
+      <span class="chev">▾</span>
+    </div>
+    <div id="console" class="closed-ps"></div>
+  </section>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const S = {
+  lastSeq: 0,
+  turns: 0, drops: 0,
+  looks: { ok: 0, nothing: 0, failed: 0 },
+  lookDots: [],
+  stepCount: 0,
+  socket: 'connecting',
+  linkUp: null,
+  command: null, commandTime: '',
+  dropsList: [],
+  fileName: null, bridgeStart: null,
+  sessLines: [],
+  agentSpeaking: false,
+};
+
+/* ---------- pills / clock ---------- */
+function setPill(el, text, cls) { el.textContent = text; el.className = 'pill ' + cls; }
+setInterval(() => { $('clock').textContent = new Date().toLocaleTimeString('en-GB'); }, 1000);
+$('clock').textContent = new Date().toLocaleTimeString('en-GB');
+
+function refreshHeader() {
+  $('cTurns').textContent = S.turns;
+  $('cDrops').textContent = S.drops;
+  $('cLooks').textContent = S.looks.ok + S.looks.nothing + S.looks.failed;
+  $('cLooksSub').textContent = `${S.looks.ok} ok · ${S.looks.nothing} none · ${S.looks.failed} fail`;
+}
+
+/* ---------- hero ---------- */
+function setCommand(text, t) {
+  const idle = $('heroIdle');
+  if (idle) idle.remove();
+  const el = $('heroCmd');
+  el.textContent = text;
+  el.classList.remove('pulse', 'arrived');
+  void el.offsetWidth;               // restart animation
+  el.classList.add('pulse');
+  if (/arrived/i.test(text)) el.classList.add('arrived');
+  $('heroTime').textContent = t || '';
+  $('heroMeta').style.display = 'flex';
+}
+
+/* ---------- bubbles ---------- */
+const chat = $('chat');
+function addBubble(kind, t, text) {
+  const empty = $('chatEmpty');
+  if (empty) empty.remove();
+  const b = document.createElement('div');
+  b.className = 'bubble ' + (kind === 'agent' ? 'b-agent' : 'b-visitor');
+  const tt = document.createElement('span');
+  tt.className = 't'; tt.textContent = t || '';
+  b.appendChild(tt);
+  if (kind === 'agent') b.appendChild(renderAgentHTML(text));
+  else b.appendChild(document.createTextNode(text));
+  chat.appendChild(b);
+  while (chat.children.length > 250) chat.removeChild(chat.firstChild);
+  if (chatScrollStick()) chat.scrollTop = chat.scrollHeight;
+}
+function chatScrollStick() {
+  return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 60;
+}
+chat.addEventListener('scroll', () => { chat._stick = chatScrollStick(); });
+
+// Wrap every "Operator, ..." sentence (up to . or ?) in an amber chip.
+function renderAgentHTML(text) {
+  const frag = document.createDocumentFragment();
+  const re = /Operator,/g;
+  let i = 0, m;
+  while ((m = re.exec(text))) {
+    frag.appendChild(document.createTextNode(text.slice(i, m.index)));
+    let end = text.length;
+    for (const ch of ['.', '?']) {
+      const p = text.indexOf(ch, m.index + 9);
+      if (p >= 0 && p < end) end = p + 1;
+    }
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = text.slice(m.index, end);
+    frag.appendChild(chip);
+    i = end;
+    re.lastIndex = end;
+  }
+  frag.appendChild(document.createTextNode(text.slice(i)));
+  return frag;
+}
+
+/* ---------- console ---------- */
+const consoleEl = $('console');
+let conStick = true;
+consoleEl.addEventListener('scroll', () => {
+  conStick = consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 60;
+});
+function addConsole(ev) {
+  const div = document.createElement('div');
+  div.className = 'cl ' + (ev.kind || 'system') + (ev.kind === 'playstate' ? ' ps' : '');
+  const ts = ev.t ? `<span class="ts">[${esc(ev.t)}]</span> ` : '';
+  const tag = ev.tag ? `<span class="ts">${esc(ev.tag)}:</span> ` : '';
+  div.innerHTML = ts + tag + esc(ev.text ?? ev.name ?? '');
+  consoleEl.appendChild(div);
+  while (consoleEl.children.length > 1500) consoleEl.removeChild(consoleEl.firstChild);
+  if (conStick) consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+$('showPs').addEventListener('change', e => consoleEl.classList.toggle('closed-ps', !e.target.checked));
+$('consoleHead').addEventListener('click', e => {
+  if (e.target.closest('.tgl')) return;
+  $('consoleCard').classList.toggle('closed');
+});
+
+/* ---------- camera card ---------- */
+function renderCamDots() {
+  const d = $('camDots');
+  d.innerHTML = '';
+  for (const k of S.lookDots.slice(-6)) {
+    const el = document.createElement('span');
+    el.className = 'dot ' + k;
+    d.appendChild(el);
+  }
+}
+function onLook(text) {
+  const m = /look -> (.+?)(?:, facing (.+?))? \((\d+) ms\)/.exec(text);
+  if (!m) return;
+  const [, what, facing, ms] = m;
+  const isNone = what === 'nothing';
+  const big = $('camBig');
+  big.className = isNone ? 'none' : '';
+  big.textContent = isNone ? 'No landmark in view' : what;
+  $('camSub').textContent = (facing ? `facing ${facing} · ` : '') + `${ms} ms`;
+  const key = isNone ? 'none' : 'ok';
+  S.looks[key]++;
+  S.lookDots.push(key);
+  renderCamDots();
+  refreshHeader();
+}
+function onLookFail(text) {
+  S.looks.failed++;
+  S.lookDots.push('fail');
+  renderCamDots();
+  refreshHeader();
+  const big = $('camBig');
+  if (!big.classList.contains('none')) { big.className = 'none'; big.textContent = 'Last look failed'; }
+  $('camSub').textContent = text.replace(/^look failed ?/, '');
+}
+
+/* ---------- connection / session cards ---------- */
+function onDrop(t) {
+  S.drops++;
+  S.dropsList.unshift(t || '');
+  S.dropsList = S.dropsList.slice(0, 6);
+  $('connDrops').innerHTML = S.dropsList.length
+    ? S.dropsList.map(x => esc(x)).join('<br>')
+    : '<span class="none">no drops</span>';
+  refreshHeader();
+}
+function onSessLine(text) {
+  S.sessLines.unshift(text);
+  S.sessLines = S.sessLines.slice(0, 4);
+  $('sessLines').innerHTML = S.sessLines.map(esc).join('<br>');
+}
+
+/* ---------- event handling ---------- */
+
+/* route stepper: -1 idle, 0 confirming start, 1 leg to door, 2 leg to cafeteria, 3 confirming arrival, 4 arrived */
+function setRoute(stage) {
+  S.routeStage = stage;
+  const n = [$('rn0'), $('rn1'), $('rn2')], l = [$('rl1'), $('rl2')];
+  [...n, ...l].forEach(el => el.classList.remove('active', 'done'));
+  if (stage < 0) return;
+  if (stage === 0) n[0].classList.add('active');
+  if (stage >= 1) n[0].classList.add('done');
+  if (stage === 1) l[0].classList.add('active');
+  if (stage >= 2) { l[0].classList.add('done'); n[1].classList.add('done'); }
+  if (stage === 2) l[1].classList.add('active');
+  if (stage >= 3) l[1].classList.add('done');
+  if (stage === 3) n[2].classList.add('active');
+  if (stage >= 4) n[2].classList.add('done');
+}
+function routeFromAgent(text) {
+  const t = text.toLowerCase();
+  if (/arrived/.test(t)) return setRoute(4);
+  if (/confirm we.re at the cafeteria/.test(t)) return setRoute(3);
+  if (/stop at the cafeteria/.test(t)) return setRoute(2);
+  if (/stop at the pitch room door/.test(t)) return setRoute(1);
+  if (/are we at the pitch room/.test(t)) return setRoute(0);
+}
+
+function handle(ev) {
+  if (typeof ev.seq === 'number') {
+    if (ev.seq <= S.lastSeq) return;   // replayed history after reconnect
+    S.lastSeq = ev.seq;
+  }
+  addConsole(ev);
+
+  if (ev.kind === 'link') {
+    S.linkUp = !!ev.up;
+    setPill($('linkPill'), ev.up ? 'SSH live' : 'SSH reconnecting', ev.up ? 'live' : 'bad');
+    $('connLink').textContent = ev.up ? 'connected' : 'reconnecting';
+    return;
+  }
+  if (ev.kind === 'file') {
+    S.fileName = ev.name;
+    S.bridgeStart = null;
+    S.stepCount = 0;
+    setRoute(-1);
+    $('sessFile').textContent = ev.name || '—';
+    $('heroStep').textContent = 'step 0';
+    return;
+  }
+
+  const text = ev.text || '';
+  const kind = ev.kind;
+
+  if (kind === 'visitor') {
+    S.turns++;
+    addBubble('visitor', ev.t, text);
+  } else if (kind === 'agent') {
+    addBubble('agent', ev.t, text);
+    routeFromAgent(text);
+    const idx = text.indexOf('Operator,');
+    if (idx >= 0) {
+      setCommand(text.slice(idx + 9).trim(), ev.t);
+      S.command = text;
+    }
+    if (/Walk|Turn|stop here/i.test(text)) {
+      S.stepCount++;
+      $('heroStep').textContent = `step ${S.stepCount}`;
+    }
+  } else if (kind === 'camera') {
+    if (text.startsWith('look failed')) onLookFail(text);
+    else if (text.startsWith('look ->')) onLook(text);
+  } else if (kind === 'state') {
+    if (/socket open|listening/.test(text)) {
+      S.socket = 'connected';
+      setPill($('sockPill'), 'Socket connected', 'live');
+    } else if (/socket error/.test(text)) {
+      S.socket = 'reconnecting';
+      setPill($('sockPill'), 'Socket reconnecting', 'warn');
+      onDrop(ev.t);
+    }
+    $('connState').textContent = S.socket === 'connected' ? 'connected' : S.socket;
+  } else if (kind === 'keys' && /fresh take/.test(text)) {
+    setRoute(-1);
+    S.stepCount = 0;
+    $('heroStep').textContent = 'step 0';
+  } else if (kind === 'playstate') {
+    const m = /state=(\d)/.exec(text);
+    S.agentSpeaking = m && m[1] === '1';
+  } else if (kind === 'system' && /bridge starting/.test(text)) {
+    S.bridgeStart = ev.t;
+    $('sessStart').textContent = ev.t || '—';
+  } else if (kind === 'system' && /CONNECTION LOST/i.test(text)) {
+    S.socket = 'reconnecting';
+    setPill($('sockPill'), 'Socket reconnecting', 'warn');
+    onDrop(ev.t);
+  }
+
+  if (kind === 'session' || kind === 'mic' || kind === 'focus') onSessLine(`${ev.tag}: ${text}`);
+  refreshHeader();
+}
+
+/* speaking indicator under the chat header area — append to hero meta instead */
+setInterval(() => {
+  let el = $('speakingTag');
+  if (S.agentSpeaking && !el) {
+    el = document.createElement('span');
+    el.id = 'speakingTag';
+    el.className = 'speaking';
+    el.textContent = 'agent speaking';
+    $('heroMeta').appendChild(el);
+  } else if (!S.agentSpeaking && el) el.remove();
+}, 500);
+
+/* ---------- SSE ---------- */
+const es = new EventSource('/events');
+es.onmessage = msg => {
+  try { handle(JSON.parse(msg.data)); } catch {}
+};
+es.onerror = () => setPill($('linkPill'), 'dashboard link —', 'warn');
+</script>
+</body>
+</html>

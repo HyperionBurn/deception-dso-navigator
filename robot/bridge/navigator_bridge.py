@@ -515,7 +515,7 @@ def build_reconnect_text(transcripts):
 # agent server can be lost and the server then drops the socket mid-reply.
 # A smaller MSS keeps every segment under it (Linux only; ignored elsewhere).
 SMALL_MSS = (((socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1300),)
-             if hasattr(socket, 'TCP_MAXSEG') else ())
+             if sys.platform.startswith('linux') else ())
 
 
 def socket_readable(ws, wait=0.5):
@@ -1271,6 +1271,9 @@ class Bridge:
 
         self.ws = None
         self._ws_lock = threading.Lock()
+        # One TLS operation at a time: OpenSSL must not read and write the
+        # same connection from two threads (mic sends vs. big audio reads).
+        self._io_lock = threading.RLock()
         self.negotiated = threading.Event()
         self.stop_event = threading.Event()
         self.fresh_event = threading.Event()
@@ -1429,7 +1432,8 @@ class Bridge:
         if ws is None:
             return False
         try:
-            ws.send(json.dumps(message))
+            with self._io_lock:
+                ws.send(json.dumps(message))
             return True
         except Exception as error:
             self.log(f'SEND: failed ({type(error).__name__}: {error}); '
@@ -1545,14 +1549,16 @@ class Bridge:
             self.ws = ws
         self.log('STATE: socket open')
         try:
-            ws.send(json.dumps({'type': 'conversation_initiation_client_data'}))
+            with self._io_lock:
+                ws.send(json.dumps({'type': 'conversation_initiation_client_data'}))
         except Exception:
             return
         while not self.stop_event.is_set() and not self.fresh_event.is_set():
             try:
                 if not socket_readable(ws):
                     continue
-                raw = ws.recv()
+                with self._io_lock:
+                    raw = ws.recv()
             except Exception as error:
                 name = type(error).__name__
                 if 'timeout' in name.lower():
