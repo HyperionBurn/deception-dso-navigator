@@ -21,6 +21,7 @@ import json
 import os
 import queue
 import select
+import socket
 import struct
 import sys
 import threading
@@ -508,6 +509,13 @@ def build_reconnect_text(transcripts):
             'question: is the robot still at the last landmark you named? '
             'Then continue with the route tool. Otherwise carry on from the '
             'last thing that was said.')
+
+
+# The venue uplink has a 1492-byte path MTU; full 1500-byte segments from the
+# agent server can be lost and the server then drops the socket mid-reply.
+# A smaller MSS keeps every segment under it (Linux only; ignored elsewhere).
+SMALL_MSS = (((socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1300),)
+             if hasattr(socket, 'TCP_MAXSEG') else ())
 
 
 def socket_readable(ws, wait=0.5):
@@ -1531,7 +1539,8 @@ class Bridge:
         import websocket
         ws = websocket.create_connection(
             url, subprotocols=['convai'], timeout=SOCKET_TIMEOUT,
-            skip_utf8_validation=True, enable_multithread=True)
+            skip_utf8_validation=True, enable_multithread=True,
+            sockopt=SMALL_MSS)
         with self._ws_lock:
             self.ws = ws
         self.log('STATE: socket open')
@@ -1999,7 +2008,8 @@ def _preflight_socket(url, check):
         ws = websocket.create_connection(url, subprotocols=['convai'],
                                          timeout=SOCKET_TIMEOUT,
                                          skip_utf8_validation=True,
-                                         enable_multithread=True)
+                                         enable_multithread=True,
+                                         sockopt=SMALL_MSS)
     except Exception as error:
         check('agent websocket', False, f'connect: {error}')
         return
