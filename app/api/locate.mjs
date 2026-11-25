@@ -2,7 +2,7 @@ import { LOCATE_FACINGS, LOCATE_PLACES, LOCATE_PROMPT } from '../lib/locate-prom
 import { accessCodeOk, getConfig, json } from '../lib/session-config.mjs';
 
 const MAX_IMAGE_BYTES = 700000;
-const UPSTREAM_TIMEOUT_MS = 12000;
+const UPSTREAM_TIMEOUT_MS = 20000;
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Reads the JSON body, streaming so a large image is rejected at the cap
