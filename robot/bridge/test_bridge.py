@@ -1620,3 +1620,39 @@ class StageAgentTests(unittest.TestCase):
                          'audio_event': {'audio_base_64':
                              base64.b64encode(b'\x01\x02').decode()}})
         self.assertEqual(bridge.play_q.qsize(), 1)
+
+
+class StageHardeningTests(unittest.TestCase):
+    def test_stage_never_plays_stall_clip(self):
+        for agent, expect_play in (('stage', False), ('navigator', True)):
+            bridge = make_bridge(agent=agent)
+            bridge.connected = True
+            bridge._stall.should_fire = lambda: True
+            played = []
+            bridge.phrases.play = played.append
+            bridge._maybe_stall_phrase()
+            self.assertEqual(bool(played), expect_play, agent)
+
+    def cue_bridge(self, lines, connected=True):
+        bridge = make_bridge()
+        bridge.connected = connected
+        logs = []
+        bridge.log = logs.append
+        with mock.patch.object(sys, 'stdin', stdio.StringIO(lines)):
+            bridge._key_reader()
+        return bridge, logs
+
+    def test_cue_keys_send_user_messages(self):
+        bridge, logs = self.cue_bridge('w\nh\nt\n')
+        sent = [m for m in bridge.ws.sent if m.get('type') == 'user_message']
+        self.assertEqual([m['text'] for m in sent], [
+            'Can you tell me where we are?',
+            'Say hi to the audience.',
+            'Thank you, goodbye!'])
+        self.assertEqual(sum('CUE:' in line for line in logs), 3)
+
+    def test_cue_while_disconnected_sends_nothing(self):
+        bridge, logs = self.cue_bridge('w\n', connected=False)
+        self.assertFalse(any(m.get('type') == 'user_message'
+                             for m in bridge.ws.sent))
+        self.assertTrue(any('CUE: not connected' in line for line in logs))

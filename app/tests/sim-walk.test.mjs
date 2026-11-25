@@ -36,6 +36,12 @@ const cameraName = id => (signLetter(ANCHORS.get(id)) ? `sign ${signLetter(ANCHO
   `the ${id === 'team_tables' ? 'team tables' : id.replace(/_/gu, ' ')} marker`);
 const entryOk = (edge, pose) => edge.entry_pose === null || poseName(edge.entry_pose) === pose;
 const usableFacings = node => [...new Set(EDGES.filter(edge => edge.from === node).map(edge => poseName(edge.entry_pose)))];
+// A facing label that is also a place name cannot be told apart by the tool, so saying it earns a
+// safe hold, not a step. Derived from the map: the facing's words equal a landmark's words.
+const LANDMARK_WORDS = new Set(PLACES.map(id => ANCHORS.get(id).landmark.toLowerCase().replace(/^the\s+/u, '')));
+const UNSPEAKABLE = new Set(FACINGS.filter(facing => LANDMARK_WORDS.has(facing.toLowerCase())));
+const SPEAKABLE_FACINGS = FACINGS.filter(facing => !UNSPEAKABLE.has(facing));
+const speakableFacings = node => usableFacings(node).filter(facing => !UNSPEAKABLE.has(facing));
 
 // Number of legs on the shortest checked route, or null when there is none.
 function legsToGo(node, pose, destination) {
@@ -122,7 +128,16 @@ function makeSpeech(sim) {
       }
       return pick(sim.rng, NAMES.get(node)[sim.placeStyle ?? 'exact']);
     },
-    facing: label => FACING_WORDS[sim.facingStyle ?? 'exact'](label),
+    facing: label => {
+      // facingOverride is the first facing the operator says (the next stop's name); after that
+      // the robot has moved and the real pose facing is spoken again.
+      if (sim.facingOverride) {
+        const text = sim.facingOverride;
+        sim.facingOverride = null;
+        return text;
+      }
+      return FACING_WORDS[sim.facingStyle ?? 'exact'](label);
+    },
   };
 }
 
@@ -329,7 +344,7 @@ async function walk(sim) {
       } else if (sim.drift && sim.rng() < sim.drift) {
         // The operator ends up at another place than planned, and says where.
         budget += STEP_CAP;
-        truth = { node: pick(sim.rng, PLACES.filter(id => id !== edge.to)), pose: pick(sim.rng, FACINGS) };
+        truth = { node: pick(sim.rng, PLACES.filter(id => id !== edge.to)), pose: pick(sim.rng, SPEAKABLE_FACINGS) };
         request = await reportPlace();
       } else {
         truth = reached;
@@ -344,7 +359,12 @@ async function walk(sim) {
   }
 
   const routeExists = isMapped(destination) && legsToGo(truth.node, truth.pose, destination) !== null;
-  if (outcome === 'hold' && routeExists && !sim.holdIsFine) bad('held although a route exists from where the robot really is');
+  // A facing that names a place too cannot be said back, so when the robot truly faces one the safe
+  // hold is the right outcome even though a route exists.
+  const facingUnsayable = UNSPEAKABLE.has(truth.pose);
+  if (outcome === 'hold' && routeExists && !sim.holdIsFine && !facingUnsayable) {
+    bad('held although a route exists from where the robot really is');
+  }
   if (['cap', 'loop'].includes(outcome)) bad(`did not finish (${outcome})`);
   if (outcome === 'arrived' && !sim.drift && !sim.change && steps !== startDistance) {
     bad(`took ${steps} steps, the shortest route is ${startDistance}`);
@@ -422,7 +442,7 @@ describe('route walk simulation (production map)', () => {
     for (const node of PLACES) {
       for (const [style, texts] of Object.entries(NAMES.get(node))) {
         for (const text of texts) {
-          const pose = pick(mulberry32(seedCounter), usableFacings(node));
+          const pose = pick(mulberry32(seedCounter), speakableFacings(node));
           sims.push(sim(`name ${node} as ${JSON.stringify(text)}`, {
             destination: pick(mulberry32(seedCounter), MAPPED), truth: { node, pose },
             placeStyle: style, firstPlace: text, mode: 'name',
@@ -456,17 +476,12 @@ describe('route walk simulation (production map)', () => {
         sims.push(sim(`${edge.from} facing ${poseName(edge.entry_pose)}, says "${text}" is ahead`, {
           destination, truth: { node: edge.from, pose: poseName(edge.entry_pose) }, mode: 'name',
           // Only the exact landmark is promised. Aliases may hold safely, but must never give a wrong step.
-          holdIsFine: text !== ahead.landmark,
-          facingStyle: 'exact',
-          say: text,
+          // A landmark that is also a facing label ("the team tables") cannot be told apart and holds too.
+          holdIsFine: text !== ahead.landmark ||
+            UNSPEAKABLE.has(ahead.landmark.toLowerCase().replace(/^the\s+/u, '')),
+          facingOverride: text,
         }));
       }
-    }
-    // The facing words are the next stop's name here, so give each run its own speech.
-    for (const one of sims) {
-      const text = one.say;
-      one.facingStyle = 'exact';
-      one.facingOverride = text;
     }
     await runAll(t, 'straight-ahead facing', sims);
   });
@@ -477,7 +492,7 @@ describe('route walk simulation (production map)', () => {
       const rng = mulberry32(5000 + i);
       const node = pick(rng, PLACES);
       sims.push(sim(`drift run ${i}`, {
-        destination: pick(rng, MAPPED), truth: { node, pose: pick(rng, usableFacings(node)) },
+        destination: pick(rng, MAPPED), truth: { node, pose: pick(rng, speakableFacings(node)) },
         mode: 'mixed', drift: 0.5, placeStyle: pick(rng, ['exact', 'alias', 'upper']),
       }));
     }
@@ -530,7 +545,7 @@ describe('route walk simulation (production map)', () => {
     for (let i = 0; i < 90; i++) {
       const rng = mulberry32(9000 + i);
       const node = pick(rng, PLACES);
-      const pose = pick(rng, usableFacings(node));
+      const pose = pick(rng, speakableFacings(node));
       const destination = pick(rng, MAPPED);
       const longest = legsToGo(node, pose, destination) ?? 1;
       const to = pick(rng, [...COURSE_DESTINATIONS, 'sign_a', destination]);

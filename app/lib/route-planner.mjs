@@ -115,6 +115,7 @@ function matchPhrases(candidates, observed) {
 // anchor landmark (an alias resolves to its anchor's landmark).
 function canonicalFacing(map, anchors, observed) {
   const candidates = new Map();
+  const edgeFacings = new Set();
   const add = (label, tokens) => {
     if (!tokens.size) return;
     const phrases = candidates.get(label) ?? [];
@@ -123,7 +124,10 @@ function canonicalFacing(map, anchors, observed) {
   };
   for (const edge of map.edges ?? []) {
     for (const pose of [edge?.entry_pose, edge?.exit_pose]) {
-      if (pose?.facing != null && validFacing(pose.facing)) add(pose.facing, tokenize(pose.facing));
+      if (pose?.facing != null && validFacing(pose.facing)) {
+        edgeFacings.add(pose.facing);
+        add(pose.facing, tokenize(pose.facing));
+      }
     }
   }
   for (const anchor of anchors.values()) {
@@ -137,7 +141,10 @@ function canonicalFacing(map, anchors, observed) {
     const keyTokens = tokenize(candidate.key);
     return keyTokens.size === observed.size && isSubset(keyTokens, observed);
   });
-  return exact.length === 1 ? exact[0].key : null;
+  if (exact.length === 1) return exact[0].key;
+  // Still tied (a facing label that is also a place name): prefer the edge pose label.
+  const poseLabels = exact.filter(candidate => edgeFacings.has(candidate.key));
+  return poseLabels.length === 1 ? poseLabels[0].key : null;
 }
 
 // Other facing labels on the map that name the same place as this one, for example

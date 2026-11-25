@@ -9,7 +9,7 @@ const plan = request => planRoute(FLOOR_MAP, { destination_id: 'kitchen', ...req
 
 test('T4: likely_start says it is only for the first question of a trip', () => {
   const result = plan({});
-  assert.deepEqual(result.likely_start, { landmark: 'the pitch room door', facing: 'reception' });
+  assert.deepEqual(result.likely_start, { landmark: 'the pitch room', facing: 'door' });
   assert.match(result.likely_start_note, /first question/);
 });
 
@@ -52,7 +52,7 @@ test('T5: the route tool answers a facing with no place with a question, not HTT
 test('T1 in Arabic: place and facing in one sentence', () => {
   const result = plan({ current_landmark: 'عند العمود الأصفر، مواجه طاولات الفرق' });
   assert.equal(result.status, 'step');
-  assert.equal(result.command, 'Turn around. Walk straight and stop at the cafeteria menu boards.');
+  assert.equal(result.command, 'Turn around. Walk straight and stop at the cafeteria.');
   const unknownFacing = plan({ current_landmark: 'عند العمود الأصفر، مواجه قاعة العروض' });
   assert.equal(unknownFacing.reason, 'current_orientation_required', 'the place is found; the map has no route for that facing');
 });

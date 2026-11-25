@@ -143,6 +143,8 @@ python3 navigator_bridge.py --mic raw --half-duplex --volume 95 --agent stage
 
 Keep `--mic raw --half-duplex --volume 95` and do **not** add `--camera-look`. The stage agent has no greeting: the robot stays silent until the host speaks. The host asks "Can you tell me where we are?" and the agent performs its bit. Because the bridge runs half-duplex, audience laughter cannot cut the bit off — just let it play. Press **Enter** for a fresh conversation between rehearsals.
 
+Cue keys (type the letter, then Enter — the robot answers exactly as if the host had asked): **w** = "Can you tell me where we are?", **h** = "Say hi to the audience.", **t** = "Thank you, goodbye!". In a loud hall, type **m** (mic off) and use **w** on cue: the robot answers exactly as if the host had asked.
+
 ## 9. Before you leave: stop and put the robot back (do not skip)
 
 Press **q** then Enter (or Ctrl+C) to stop our bridge. Then:
