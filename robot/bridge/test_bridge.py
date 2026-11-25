@@ -485,6 +485,74 @@ class LatencyLogTests(unittest.TestCase):
         self.assertEqual(rows[1][2:], ['1000', '2000', '2500'])
 
 
+class JudgeScreenTests(unittest.TestCase):
+    def test_off_by_default(self):
+        seen = []
+
+        class Recorder:
+            def __init__(self, a):
+                seen.append(a)
+
+            def run(self):
+                return 0
+
+            def shutdown(self):
+                pass
+
+        with mock.patch.object(nb, 'Bridge', Recorder):
+            nb.main(['--io', 'laptop', '--log-dir', '.'])
+            nb.main(['--io', 'laptop', '--log-dir', '.', '--judge-screen', '8765'])
+        self.assertIsNone(seen[0].judge_screen)
+        self.assertEqual(seen[1].judge_screen, 8765)
+        self.assertIsNone(make_bridge().judge)
+
+    def test_page_shows_latest_operator_step_and_escapes_text(self):
+        lines = [('VISITOR/OP', 'وين المطبخ؟'),
+                 ('AGENT', 'Operator, walk straight and stop at the purple pillar.'),
+                 ('VISITOR/OP', '<script>alert(1)</script> Done.'),
+                 ('AGENT', 'Operator, walk straight and stop at the yellow pillar.'),
+                 ('AGENT', 'تمام.')]
+        page = nb.render_judge_page(lines, '2 turns, median 900 ms, worst 1200 ms')
+        self.assertIn('<h1>Operator, walk straight and stop at the yellow pillar.</h1>', page)
+        self.assertIn('وين المطبخ؟', page)
+        self.assertNotIn('<script>', page)
+        self.assertIn('&lt;script&gt;', page)
+        self.assertIn('median 900 ms', page)
+
+    def test_server_serves_live_transcript_on_localhost_only(self):
+        import urllib.error
+        import urllib.request
+        bridge = make_bridge()
+        bridge.transcripts.append(('AGENT', 'Operator, stop here.'))
+        screen = nb.JudgeScreen(bridge, 0)
+        try:
+            self.assertEqual(screen._server.server_address[0], '127.0.0.1')
+            url = f'http://127.0.0.1:{screen.port}/'
+            body = urllib.request.urlopen(url, timeout=5).read().decode('utf-8')
+            self.assertIn('<h1>Operator, stop here.</h1>', body)
+            bridge.transcripts.append(('AGENT', 'Operator, turn left.'))
+            body = urllib.request.urlopen(url, timeout=5).read().decode('utf-8')
+            self.assertIn('<h1>Operator, turn left.</h1>', body)
+            with self.assertRaises(Exception):
+                urllib.request.urlopen(url + 'other', timeout=5)
+            rebound = urllib.request.Request(url, headers={'Host': f'evil.example:{screen.port}'})
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                urllib.request.urlopen(rebound, timeout=5)
+            self.assertEqual(caught.exception.code, 403)
+            local = urllib.request.Request(url, headers={'Host': 'localhost:18080'})  # SSH tunnel port
+            self.assertIn('Operator, turn left.', urllib.request.urlopen(local, timeout=5).read().decode('utf-8'))
+        finally:
+            screen.close()
+
+    def test_bad_port_warns_and_bridge_goes_on(self):
+        bridge = make_bridge(judge_screen=65536)
+        logs = []
+        bridge.log = logs.append
+        bridge._start_judge()
+        self.assertIsNone(bridge.judge)
+        self.assertTrue(any(line.startswith('WARN: judge screen not started') for line in logs))
+
+
 class FakeBridge:
     def __init__(self):
         self.logs = []
