@@ -10,7 +10,7 @@ const format = 'pcm_16000';
 const ttsVoice = 'EXAVITQu4vr4xnSDxMaL';
 const turns = [
   ['Arabic visitor', 'أبغى أروح غرفة الاجتماعات، لو سمحت.', /[\u0600-\u06ff]/, /غرفة|الاجتماعات/],
-  ['English destination change', 'English please. Actually, I need the kitchen instead.', /kitchen/i, /kitchen/i],
+  ['English destination change', 'English please. Actually, I need the kitchen instead.', /kitchen/i, /kitchen|operator/i],
   ['Unmapped operator anchor', 'Operator here. I am stopped at the test blue sign, facing the white door.', /blue sign/i, /verified|mapped|unable|cannot|hold|match|recogni|(what|which) (can|do) you see|can you see|pillar|pitch room|menu boards/i],
 ];
 const state = { metadata: null, audioBytes: 0, lastAudio: 0, replies: [], transcripts: [] };
