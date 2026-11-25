@@ -1526,3 +1526,97 @@ class CameraLookTests(unittest.TestCase):
                                  session='direct')
         self.assertFalse(bridge.camera_look)
         self.assertTrue(any('access code' in line for line in logs))
+
+
+class StageAgentTests(unittest.TestCase):
+    """--agent stage: /api/session body, session_url log, CLI parsing."""
+
+    class _Response:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return json.dumps({'signed_url': 'wss://x'}).encode()
+
+    def opener(self, captured):
+        def open_url(request, timeout=None):
+            captured['request'] = request
+            return self._Response()
+        return open_url
+
+    def test_stage_body_includes_agent(self):
+        captured = {}
+        nb.request_signed_url('https://site.test', 'test-code',
+                              opener=self.opener(captured), agent='stage')
+        self.assertEqual(json.loads(captured['request'].data),
+                         {'access_code': 'test-code', 'agent': 'stage'})
+
+    def test_navigator_body_unchanged(self):
+        for agent in ('navigator', None):
+            captured = {}
+            kwargs = {} if agent is None else {'agent': agent}
+            nb.request_signed_url('https://site.test', 'test-code',
+                                  opener=self.opener(captured), **kwargs)
+            self.assertEqual(json.loads(captured['request'].data),
+                             {'access_code': 'test-code'})
+
+    def test_session_url_logs_stage(self):
+        logs = []
+        with mock.patch.object(nb, 'request_signed_url',
+                               return_value='wss://signed') as m:
+            url = nb.session_url('site', 'https://site.test', 'c', 'a', None,
+                                 log=logs.append, agent='stage')
+        self.assertEqual(url, 'wss://signed')
+        self.assertEqual(m.call_args.kwargs.get('agent'), 'stage')
+        self.assertIn('SESSION: site /api/session (stage agent)', logs)
+
+    def test_session_url_navigator_log_unchanged(self):
+        logs = []
+        with mock.patch.object(nb, 'request_signed_url',
+                               return_value='wss://signed') as m:
+            nb.session_url('site', 'https://site.test', 'c', 'a', None,
+                           log=logs.append)
+        self.assertEqual(m.call_args.kwargs.get('agent'), 'navigator')
+        self.assertIn('SESSION: site /api/session', logs)
+        self.assertFalse(any('(stage agent)' in line for line in logs))
+
+    def test_cli_parses_agent_flag(self):
+        seen = []
+
+        class FakeBridge:
+            def __init__(self, args):
+                seen.append(args)
+
+            def run(self):
+                return 0
+
+            def shutdown(self):
+                pass
+
+        with mock.patch.object(nb, 'Bridge', FakeBridge):
+            self.assertEqual(nb.main(['--io', 'null', '--agent', 'stage']), 0)
+            self.assertEqual(nb.main(['--io', 'null']), 0)
+        self.assertEqual(seen[0].agent, 'stage')
+        self.assertEqual(seen[1].agent, 'navigator')
+
+    def test_stage_bit_repeat_not_muted_after_drop(self):
+        bridge = make_bridge()
+        bridge.on_event(METADATA)
+        bit = 'Ooh, great question. ' * 40
+        bridge.on_event({'type': 'user_transcript',
+                         'user_transcription_event':
+                             {'user_transcript': 'where are we?'}})
+        bridge.on_event({'type': 'agent_response',
+                         'agent_response_event': {'agent_response': bit}})
+        self.assertIsNone(bridge._greeting)
+        self.assertEqual(len(bridge.transcripts), 2)   # visitor + agent
+        # Drop + reconnect: the mute only applies to a heard greeting.
+        bridge._mute_greeting = True
+        bridge.on_event({'type': 'agent_response',
+                         'agent_response_event': {'agent_response': bit}})
+        self.assertEqual(len(bridge.transcripts), 3)
+        self.assertEqual(bridge.transcripts[-1][0], 'AGENT')
+        self.assertEqual(bridge.transcripts[-1][1].strip(), bit.strip())
+        self.assertFalse(bridge._mute_greeting)
+        bridge.on_event({'type': 'audio',
+                         'audio_event': {'audio_base_64':
+                             base64.b64encode(b'\x01\x02').decode()}})
+        self.assertEqual(bridge.play_q.qsize(), 1)

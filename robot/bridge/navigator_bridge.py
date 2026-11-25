@@ -533,12 +533,15 @@ def socket_readable(ws, wait=0.5):
     return bool(ready)
 
 
-def request_signed_url(site, code, opener=None):
+def request_signed_url(site, code, opener=None, agent='navigator'):
     """POST {site}/api/session and return the signed websocket URL."""
     open_url = opener or urllib.request.urlopen
+    payload = {'access_code': code}
+    if agent == 'stage':
+        payload['agent'] = 'stage'
     request = urllib.request.Request(
         f'{site}/api/session',
-        data=json.dumps({'access_code': code}).encode('utf-8'),
+        data=json.dumps(payload).encode('utf-8'),
         headers={'content-type': 'application/json', 'origin': site},
         method='POST',
     )
@@ -569,15 +572,17 @@ def direct_signed_url(agent_id, api_key, opener=None):
     return url
 
 
-def session_url(session, site, code, agent_id, api_key, log=lambda *a: None):
+def session_url(session, site, code, agent_id, api_key, log=lambda *a: None,
+                agent='navigator'):
     """Resolve a websocket URL. auto = our site first, direct ElevenLabs as
     fallback when an API key is configured."""
     if session == 'direct':
         log('SESSION: direct (get-signed-url)')
         return direct_signed_url(agent_id, api_key)
     try:
-        url = request_signed_url(site, code)
-        log('SESSION: site /api/session')
+        url = request_signed_url(site, code, agent=agent)
+        log('SESSION: site /api/session'
+            + (' (stage agent)' if agent == 'stage' else ''))
         return url
     except Exception:
         if session == 'site' or not api_key:
@@ -1244,6 +1249,7 @@ class Bridge:
         self.site = args.url.rstrip('/')
         self.code = args.code or os.environ.get('NAVIGATOR_ACCESS_CODE', '')
         self.session_mode = getattr(args, 'session', 'auto')
+        self.agent = getattr(args, 'agent', 'navigator')
         self.agent_id = (getattr(args, 'agent_id', None)
                          or os.environ.get('ELEVENLABS_AGENT_ID')
                          or PROD_AGENT_ID)
@@ -1283,6 +1289,7 @@ class Bridge:
         self.reconnected = False
         self._greeting = None
         self._mute_greeting = False
+        self._heard_user = False
         self.camera_look = bool(getattr(args, 'camera_look', False))
         if self.camera_look:
             if not isinstance(self.io, RobotIO):
@@ -1489,6 +1496,7 @@ class Bridge:
             return
         if kind == 'user_transcript':
             self._mute_greeting = False
+            self._heard_user = True
             self.last_user_at = time.monotonic()
             self._stall.note_transcript()
             self.latency.note_transcript()
@@ -1498,9 +1506,9 @@ class Bridge:
         if kind == 'agent_response':
             text = (event.get('agent_response_event') or {}).get('agent_response')
             if isinstance(text, str):
-                if self._greeting is None:
+                if self._greeting is None and not self._heard_user:
                     self._greeting = text
-                if (self._mute_greeting and
+                if (self._mute_greeting and self._greeting is not None and
                         text.strip() == self._greeting.strip()):
                     self.log('STATE: repeat greeting muted')
                     return
@@ -1638,7 +1646,8 @@ class Bridge:
 
     def _session_url(self):
         return session_url(self.session_mode, self.site, self.code,
-                           self.agent_id, self.api_key, log=self.log)
+                           self.agent_id, self.api_key, log=self.log,
+                           agent=self.agent)
 
     def _start_judge(self):
         if self.judge_port is None:
@@ -1838,7 +1847,8 @@ def run_preflight(args):
     url = None
     try:
         url = session_url(args.session, site, code, agent_id, api_key,
-                          log=lambda *a: None)
+                          log=lambda *a: None,
+                          agent=getattr(args, 'agent', 'navigator'))
         check('signed session url', True,
               f'{args.session} path')
     except Exception as error:
@@ -2081,6 +2091,9 @@ def main(argv=None):
                         help='read-only ArUco marker sightings on the RGB-D '
                              'front camera, sent to the agent as '
                              'contextual_update (needs cv2 in the container)')
+    parser.add_argument('--agent', choices=['navigator', 'stage'],
+                        default='navigator',
+                        help='stage selects the Doers Summit agent via /api/session')
     parser.add_argument('--camera-look', action='store_true',
                         help='periodic camera frames to /api/locate for '
                              'position notes (robot IO only, on-demand grabs)')

@@ -66,6 +66,15 @@ export default {
       return json({ error: 'Invalid access code.' }, 401);
     }
 
+    const selection = payload.agent === undefined ? 'navigator' : payload.agent;
+    let agentId = config.agentId;
+    if (selection === 'stage') {
+      agentId = config.stageAgentId;
+      if (!agentId) return json({ error: 'Stage agent unavailable.' }, 503);
+    } else if (selection !== 'navigator') {
+      return json({ error: 'Invalid request.' }, 400);
+    }
+
     try {
       const client = new ElevenLabsClient({
         apiKey: config.apiKey,
@@ -74,8 +83,8 @@ export default {
         maxRetries: 0,
         fetch: (input, init) => fetch(input, { ...init, redirect: 'error' }),
       });
-      const { signedUrl } = await client.conversationalAi.conversations.getSignedUrl({ agentId: config.agentId });
-      if (safeSignedUrl(signedUrl, config)) return json({ signed_url: signedUrl });
+      const { signedUrl } = await client.conversationalAi.conversations.getSignedUrl({ agentId });
+      if (safeSignedUrl(signedUrl, { ...config, agentId })) return json({ signed_url: signedUrl });
     } catch {
       // Do not log provider errors. They can contain credentials or signed URLs.
     }

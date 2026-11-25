@@ -133,6 +133,16 @@ Also note: how long it takes to answer, whether it cuts itself off, whether the 
 
 `--camera-look` lets the robot work out where it is by itself. About every 10 seconds the bridge grabs one photo from the robot's front camera and sends it to our site, which asks a vision model which mapped landmark is in view; the answer arrives as a "Camera:" note the agent can use. Photos are sent one at a time and are not stored anywhere. If the log shows `CAMERA: no front camera topic found`, run `ros2 topic list | grep -i image` to see the real topic name and restart with `--camera-topic <name>`. If anything misbehaves, restart without `--camera-look` and the robot works exactly as before.
 
+## 8c. Stage demo (Doers Summit)
+
+For the stage slot, start the bridge with the stage agent instead of the navigator:
+
+```bash
+python3 navigator_bridge.py --mic raw --half-duplex --volume 95 --agent stage
+```
+
+Keep `--mic raw --half-duplex --volume 95` and do **not** add `--camera-look`. The stage agent has no greeting: the robot stays silent until the host speaks. The host asks "Can you tell me where we are?" and the agent performs its bit. Because the bridge runs half-duplex, audience laughter cannot cut the bit off — just let it play. Press **Enter** for a fresh conversation between rehearsals.
+
 ## 9. Before you leave: stop and put the robot back (do not skip)
 
 Press **q** then Enter (or Ctrl+C) to stop our bridge. Then:
