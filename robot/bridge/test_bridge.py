@@ -247,7 +247,9 @@ class ReconnectTextTests(unittest.TestCase):
         text = nb.build_reconnect_text([('VISITOR/OP', 'booth'), ('AGENT', 'go north')])
         self.assertIn('VISITOR/OP: booth', text)
         self.assertIn('AGENT: go north', text)
-        self.assertIn('position', text)
+        self.assertIn('Do not greet again', text)
+        self.assertIn('route tool', text)
+        self.assertNotIn("confirm the robot's position before any new step", text)
 
 
 class SignedUrlTests(unittest.TestCase):
@@ -1079,3 +1081,149 @@ class PlaybackPathTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+import socket as _socket
+
+
+class SocketReadableTests(unittest.TestCase):
+    def test_no_sock_attr_returns_true(self):
+        self.assertTrue(nb.socket_readable(FakeWS(), wait=0.01))
+
+    def test_pending_bytes_returns_true(self):
+        ws = types.SimpleNamespace(
+            sock=types.SimpleNamespace(pending=lambda: 1))
+        self.assertTrue(nb.socket_readable(ws, wait=0.01))
+
+    def test_idle_socket_blocks_then_reports_readable(self):
+        left, right = _socket.socketpair()
+        try:
+            ws = types.SimpleNamespace(sock=left)
+            self.assertFalse(nb.socket_readable(ws, wait=0.05))
+            right.send(b'x')
+            self.assertTrue(nb.socket_readable(ws, wait=0.5))
+        finally:
+            left.close()
+            right.close()
+
+    def test_closed_socket_returns_true(self):
+        sock = _socket.socket()
+        sock.close()
+        ws = types.SimpleNamespace(sock=sock)
+        self.assertTrue(nb.socket_readable(ws, wait=0.01))
+
+
+class RunSocketTimeoutTests(unittest.TestCase):
+    def test_no_short_settimeout_on_the_socket(self):
+        bridge = make_bridge()
+        bridge.ws = None
+
+        class TimeoutWS(FakeWS):
+            def __init__(self):
+                super().__init__()
+                self.timeouts = []
+
+            def settimeout(self, value):
+                self.timeouts.append(value)
+
+            def recv(self):
+                return ''
+
+        ws = TimeoutWS()
+        fake_module = types.SimpleNamespace(
+            create_connection=lambda *a, **k: ws)
+        with mock.patch.dict(sys.modules, {'websocket': fake_module}):
+            bridge._run_socket('wss://example.invalid')
+        self.assertEqual(ws.timeouts, [])
+        self.assertTrue(ws.closed)
+        self.assertIsNone(bridge.ws)
+
+
+class SendFailureTests(unittest.TestCase):
+    def test_failed_send_logs_and_closes(self):
+        logs = []
+        bridge = make_bridge()
+        bridge.log = logs.append
+
+        class DeadWS(FakeWS):
+            def send(self, raw):
+                raise OSError('broken pipe')
+
+        bridge.ws = ws = DeadWS()
+        self.assertFalse(bridge._send({'type': 'pong', 'event_id': 1}))
+        self.assertTrue(ws.closed)
+        self.assertIsNone(bridge.ws)
+        self.assertTrue(any('SEND: failed' in line and 'OSError' in line
+                            for line in logs))
+
+    def test_send_without_socket_is_silent_false(self):
+        logs = []
+        bridge = make_bridge()
+        bridge.log = logs.append
+        bridge.ws = None
+        self.assertFalse(bridge._send({'type': 'pong'}))
+        self.assertFalse(any('SEND: failed' in line for line in logs))
+
+
+class GreetingMuteTests(unittest.TestCase):
+    def audio(self, payload=b'\x01\x02'):
+        return {'type': 'audio',
+                'audio_event': {'audio_base_64': base64.b64encode(payload).decode()}}
+
+    def response(self, text):
+        return {'type': 'agent_response',
+                'agent_response_event': {'agent_response': text}}
+
+    def test_first_greeting_stored_and_audio_queued(self):
+        bridge = make_bridge()
+        bridge.on_event(METADATA)
+        bridge.on_event(self.response('Ahlan! How can I help?'))
+        self.assertEqual(bridge._greeting, 'Ahlan! How can I help?')
+        self.assertEqual(list(bridge.transcripts),
+                         [('AGENT', 'Ahlan! How can I help?')])
+        bridge.on_event(self.audio())
+        self.assertEqual(bridge.play_q.qsize(), 1)
+
+    def test_repeat_greeting_muted_after_drop(self):
+        logs = []
+        bridge = make_bridge()
+        bridge.log = logs.append
+        bridge.on_event(METADATA)
+        bridge.on_event(self.response('Ahlan! How can I help?'))
+        bridge.on_event(self.audio())
+        bridge.play_q.get()
+        # Simulate the unexpected drop path.
+        bridge.reconnected = True
+        bridge._mute_greeting = True
+        bridge.on_event(self.response('  Ahlan! How can I help? '))
+        self.assertEqual(len(bridge.transcripts), 1)
+        self.assertTrue(any('repeat greeting muted' in line for line in logs))
+        bridge.on_event(self.audio())
+        self.assertTrue(bridge.play_q.empty())
+
+    def test_user_transcript_unmutes(self):
+        bridge = make_bridge()
+        bridge.on_event(METADATA)
+        bridge.on_event(self.response('Ahlan! How can I help?'))
+        bridge._mute_greeting = True
+        bridge.on_event({'type': 'user_transcript',
+                         'user_transcription_event': {'user_transcript': 'hi'}})
+        self.assertFalse(bridge._mute_greeting)
+        bridge.on_event(self.audio())
+        self.assertEqual(bridge.play_q.qsize(), 1)
+
+    def test_different_response_unmutes(self):
+        bridge = make_bridge()
+        bridge.on_event(METADATA)
+        bridge.on_event(self.response('Ahlan! How can I help?'))
+        bridge._mute_greeting = True
+        bridge.on_event(self.response('Operator, which way are we facing?'))
+        self.assertFalse(bridge._mute_greeting)
+        self.assertEqual(bridge.transcripts[-1],
+                         ('AGENT', 'Operator, which way are we facing?'))
+
+    def test_fresh_take_unmutes(self):
+        bridge = make_bridge()
+        bridge._mute_greeting = True
+        bridge.fresh_take('test')
+        self.assertFalse(bridge._mute_greeting)

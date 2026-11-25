@@ -20,6 +20,7 @@ import http.server
 import json
 import os
 import queue
+import select
 import struct
 import sys
 import threading
@@ -497,9 +498,28 @@ def build_reconnect_text(transcripts):
     """Transcript memory injected after an unexpected socket drop."""
     lines = [f'{role}: {text}' for role, text in transcripts]
     history = ' / '.join(lines[-TRANSCRIPT_LINES:]) or '(nothing yet)'
-    return ('Reconnected after a network drop. Conversation so far: ' + history +
-            ' Continue from where it stopped; ask the operator to confirm '
-            "the robot's position before any new step.")
+    return ('Reconnected after a short network drop. Do not greet again and '
+            'do not ask where the visitor wants to go if a destination was '
+            'already confirmed. Conversation so far: ' + history +
+            ' If a route was under way, ask the operator one yes/no '
+            'question: is the robot still at the last landmark you named? '
+            'Then continue with the route tool. Otherwise carry on from the '
+            'last thing that was said.')
+
+
+def socket_readable(ws, wait=0.5):
+    """True when recv() will not block: decrypted bytes pending or the socket is readable."""
+    sock = getattr(ws, 'sock', None)
+    if sock is None:
+        return True          # fakes in tests: recv() does its own waiting
+    pending = getattr(sock, 'pending', None)
+    if callable(pending) and pending():
+        return True
+    try:
+        ready, _, _ = select.select([sock], [], [], wait)
+    except (OSError, ValueError):
+        return True          # closed socket: let recv() report it
+    return bool(ready)
 
 
 def request_signed_url(site, code, opener=None):
@@ -1108,6 +1128,8 @@ class Bridge:
         self._backlog_warned = False
         self.connected = False
         self.reconnected = False
+        self._greeting = None
+        self._mute_greeting = False
         self.dropping = False
         self.error_state = False
         self.last_user_at = 0.0
@@ -1242,7 +1264,10 @@ class Bridge:
         try:
             ws.send(json.dumps(message))
             return True
-        except Exception:
+        except Exception as error:
+            self.log(f'SEND: failed ({type(error).__name__}: {error}); '
+                     'closing socket')
+            self._close_ws()
             return False
 
     def send_contextual(self, text):
@@ -1276,6 +1301,8 @@ class Bridge:
                 self._send({'type': 'pong', 'event_id': event_id})
             return
         if kind == 'audio':
+            if self._mute_greeting:
+                return
             audio = event.get('audio_event') or {}
             payload = audio.get('audio_base_64')
             if self.negotiated.is_set() and isinstance(payload, str) and payload:
@@ -1291,6 +1318,7 @@ class Bridge:
             self.log('STATE: interrupted — playback cleared')
             return
         if kind == 'user_transcript':
+            self._mute_greeting = False
             self.last_user_at = time.monotonic()
             self._stall.note_transcript()
             self.latency.note_transcript()
@@ -1298,8 +1326,16 @@ class Bridge:
                             (event.get('user_transcription_event') or {}).get('user_transcript'))
             return
         if kind == 'agent_response':
-            self.transcript('AGENT',
-                            (event.get('agent_response_event') or {}).get('agent_response'))
+            text = (event.get('agent_response_event') or {}).get('agent_response')
+            if isinstance(text, str):
+                if self._greeting is None:
+                    self._greeting = text
+                if (self._mute_greeting and
+                        text.strip() == self._greeting.strip()):
+                    self.log('STATE: repeat greeting muted')
+                    return
+                self._mute_greeting = False
+            self.transcript('AGENT', text)
             return
         if kind == 'agent_response_correction':
             text = (event.get('agent_response_correction_event') or {}).get('corrected_agent_response')
@@ -1334,7 +1370,6 @@ class Bridge:
         ws = websocket.create_connection(
             url, subprotocols=['convai'], timeout=SOCKET_TIMEOUT,
             skip_utf8_validation=True)
-        ws.settimeout(0.5)
         with self._ws_lock:
             self.ws = ws
         self.log('STATE: socket open')
@@ -1344,12 +1379,14 @@ class Bridge:
             return
         while not self.stop_event.is_set() and not self.fresh_event.is_set():
             try:
+                if not socket_readable(ws):
+                    continue
                 raw = ws.recv()
             except Exception as error:
                 name = type(error).__name__
                 if 'timeout' in name.lower():
                     continue
-                self.log(f'STATE: socket error ({name})')
+                self.log(f'STATE: socket error ({name}: {error})')
                 break
             if not raw:
                 break
@@ -1422,6 +1459,7 @@ class Bridge:
             # Unexpected drop: reconnect with transcript memory.
             self.log('CONNECTION LOST')
             self.reconnected = True
+            self._mute_greeting = True
             self.dropping = True
             self.phrases.play('lost_en', 'lost_ar')
             if attempts >= len(RECONNECT_DELAYS):
@@ -1463,6 +1501,7 @@ class Bridge:
         self.log(f'{source.upper()}: fresh take')
         self.transcripts.clear()
         self.reconnected = False
+        self._mute_greeting = False
         self.dropping = False
         self.error_state = False
         self._stall.reset()
