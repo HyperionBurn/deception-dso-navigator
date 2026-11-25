@@ -107,6 +107,7 @@ python3 navigator_bridge.py --mic raw --half-duplex --volume 95
 - `--mic raw`: the raw microphone, **no wake word needed**. Just talk.
 - `--half-duplex`: the raw microphone has no echo cancellation, so the robot would hear and answer itself without this. It means the robot does not listen while it is speaking: wait until it finishes, then talk.
 - `--volume 95`: for the loud hall (the robot's normal volume is 72).
+- In the log, `FOCUS: request -> focus_gain=True` means we hold the speaker. `False` or `service unavailable`: check step 4 and step 5.
 - **Enter** = start a fresh take. **q** then Enter = quit. Touching the robot's head also starts a fresh take.
 
 You should hear: "أهلًا، أنا دليل آلي بالذكاء الاصطناعي. Hi, I'm an AI robot guide. Where would you like to go?"
