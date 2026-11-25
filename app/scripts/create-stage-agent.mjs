@@ -32,6 +32,12 @@ for (const key of Object.keys(conversationConfig.agent.prompt.built_in_tools ?? 
 }
 conversationConfig.language_presets = {};
 conversationConfig.conversation.max_duration_seconds = 1800;
+// No stall nudges or filler on stage: silence and long pauses are the show.
+conversationConfig.turn.turn_timeout = -1;
+conversationConfig.turn.soft_timeout_config = {
+  ...(conversationConfig.turn.soft_timeout_config ?? {}),
+  timeout_seconds: -1,
+};
 
 const body = {
   name: 'Deception Stage - Doers Summit',
@@ -66,6 +72,8 @@ const checks = [
   ['built_in_tools null', Object.values(cfg.agent.prompt.built_in_tools ?? {}).every(v => v === null)],
   ['language_presets empty', Object.keys(cfg.language_presets ?? {}).length === 0],
   ['max_duration 1800', cfg.conversation.max_duration_seconds === 1800],
+  ['turn_timeout -1', cfg.turn?.turn_timeout === -1],
+  ['soft_timeout -1', cfg.turn?.soft_timeout_config?.timeout_seconds === -1],
   ['tts pcm_16000', JSON.stringify(cfg.tts ?? {}).includes('pcm_16000')],
   ['asr pcm_16000', JSON.stringify(cfg.asr ?? {}).includes('pcm_16000')],
 ];

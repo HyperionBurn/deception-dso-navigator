@@ -5,8 +5,8 @@ import { planRoute } from '../lib/route-planner.mjs';
 
 // Problems T1 to T3 from the role-play replays (qa/sim/SIM_REPORT.md), on the real demo map.
 const plan = request => planRoute(FLOOR_MAP, { destination_id: 'kitchen', ...request });
-const TURN_LEFT = 'Turn left. Walk straight and stop at the cafeteria menu boards.';
-const TURN_AROUND = 'Turn around. Walk straight and stop at the cafeteria menu boards.';
+const TURN_LEFT = 'Turn left. Walk straight and stop at the cafeteria.';
+const TURN_AROUND = 'Turn around. Walk straight and stop at the cafeteria.';
 
 test('T1: a facing said inside the position text does not change which place it is', () => {
   // "pitch room" in the facing used to win over "sign B" and put the operator at the pitch room door.
@@ -18,7 +18,8 @@ test('T1: a facing said inside the position text does not change which place it 
 
 test('T1: a facing in the position text is used when no facing was sent', () => {
   assert.equal(plan({ current_landmark: 'I am at sign B, facing reception' }).command, TURN_LEFT);
-  assert.equal(plan({ current_landmark: 'sign B looking at the team tables' }).command, TURN_AROUND);
+  // "the team tables" now names a place as well as a facing, so it asks; "the purple pillar" still works.
+  assert.equal(plan({ current_landmark: 'sign B looking at the purple pillar' }).command, TURN_AROUND);
 });
 
 test('T1: a facing that was sent on its own wins over the one in the text', () => {
@@ -33,6 +34,7 @@ test('T1: a facing with no place is not a position', () => {
 });
 
 test('T2: another name for the same place works as a facing', () => {
+  // "team tables" is both a place and an edge facing label; the edge label wins the tie.
   const byLabel = plan({ current_landmark: 'sign B', facing: 'team tables' });
   assert.equal(byLabel.command, TURN_AROUND);
   for (const facing of ['the purple pillar', 'purple pillar', 'toward the purple pillar']) {

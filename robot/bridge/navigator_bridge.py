@@ -101,6 +101,10 @@ def guard_ros_name(name):
 # --- local fallback phrases ---------------------------------------------------
 PHRASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'phrases')
 STALL_SECONDS = 6.0       # no agent audio this long after a user turn -> "One moment."
+# Line-based cue keys: typed lines that act as if the host spoke them.
+CUE_KEYS = {'w': 'Can you tell me where we are?',
+            'h': 'Say hi to the audience.',
+            't': 'Thank you, goodbye!'}
 MIC_RMS_FLOOR = 300       # int16 RMS; quiet-room noise sits well below this
 PHASE_SIGNALS = {
     'connecting':    {'led': (3, 255, 170, 0),   'emoji': 50},   # flowing amber, open eyes
@@ -1388,9 +1392,15 @@ class Bridge:
             if self.muted or (self.half_duplex and self.clock.active()):
                 chunk = SILENCE
             self.latency.note_mic(chunk)
-            if self.connected and self._stall.should_fire():
-                self.phrases.play('wait_en')
+            self._maybe_stall_phrase()
             self._send({'user_audio_chunk': base64.b64encode(chunk).decode('ascii')})
+
+    def _maybe_stall_phrase(self):
+        # Stage agent: audience noise must never trigger the local "One moment." clip.
+        if self.agent == 'stage':
+            return
+        if self.connected and self._stall.should_fire():
+            self.phrases.play('wait_en')
 
     # -- playback path -------------------------------------------------------
 
@@ -1729,7 +1739,8 @@ class Bridge:
     # -- console keys ---------------------------------------------------------
 
     def _key_reader(self):
-        self.log('KEYS: Enter = fresh take | m = mic mute | q = quit')
+        self.log('KEYS: Enter = fresh take | m = mic mute | '
+                 'w/h/t = stage cues | q = quit')
         while not self.stop_event.is_set():
             try:
                 line = sys.stdin.readline()
@@ -1745,6 +1756,13 @@ class Bridge:
             if line == 'm':
                 self.muted = not self.muted
                 self.log(f'KEYS: mic {"muted" if self.muted else "live"}')
+            elif line in CUE_KEYS:
+                cue = CUE_KEYS[line]
+                if self.connected:
+                    self.log(f'CUE: {cue}')
+                    self._send({'type': 'user_message', 'text': cue})
+                else:
+                    self.log('CUE: not connected')
             elif line == '':
                 self.fresh_take('keys')
 
