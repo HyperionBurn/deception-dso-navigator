@@ -41,8 +41,7 @@ function validBody(body) {
     !(body.current_id != null && body.current_landmark != null) &&
     (body.heading == null || validHeading(body.heading)) &&
     (body.facing == null || validFacing(body.facing)) &&
-    !(body.heading != null && body.facing != null) &&
-    (body.current_id != null || body.current_landmark != null || (body.heading == null && body.facing == null));
+    !(body.heading != null && body.facing != null);
 }
 
 export default {
