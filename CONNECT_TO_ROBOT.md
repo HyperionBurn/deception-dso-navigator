@@ -101,7 +101,7 @@ It prints PASS or FAIL per line: internet, agent session, ROS topics, mic, speak
 ## 7. Run it
 
 ```bash
-python3 navigator_bridge.py --mic raw --half-duplex --volume 95
+python3 navigator_bridge.py --mic raw --half-duplex --volume 95 --camera-look
 ```
 
 - `--mic raw`: the raw microphone, **no wake word needed**. Just talk.
@@ -131,7 +131,7 @@ Also note: how long it takes to answer, whether it cuts itself off, whether the 
 
 ## 8b. Camera
 
-Do not add `--camera-markers`: that mode only reads printed signs, and we have none. A mode that recognises the floor's own landmarks is not in this version.
+`--camera-look` lets the robot work out where it is by itself. About every 10 seconds the bridge grabs one photo from the robot's front camera and sends it to our site, which asks a vision model which mapped landmark is in view; the answer arrives as a "Camera:" note the agent can use. Photos are sent one at a time and are not stored anywhere. If the log shows `CAMERA: no front camera topic found`, run `ros2 topic list | grep -i image` to see the real topic name and restart with `--camera-topic <name>`. If anything misbehaves, restart without `--camera-look` and the robot works exactly as before.
 
 ## 9. Before you leave: stop and put the robot back (do not skip)
 
